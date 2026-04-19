@@ -4,6 +4,7 @@ Runs a single Claude Code task non-interactively, saves output to DB.
 Usage: invoked by spawn.py via tmux; not called directly.
 """
 import sys
+import os
 import subprocess
 
 from . import db
@@ -15,6 +16,9 @@ def run(task_id: str, allowed_tools: list[str] = None):
     cmd = ["claude", "-p", task["prompt"]]
     if allowed_tools:
         cmd += ["--allowedTools", ",".join(allowed_tools)]
+    model = os.environ.get("CLAUDE_MODEL")
+    if model:
+        cmd += ["--model", model]
 
     try:
         result = subprocess.run(

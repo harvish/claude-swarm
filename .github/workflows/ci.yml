@@ -65,8 +65,7 @@ jobs:
 
           # Basic lifecycle
           tid = db.create_task("ci validation task")
-          task = db.get_task(tid)
-          assert task["status"] == "pending"
+          assert db.get_task(tid)["status"] == "pending"
 
           db.set_running(tid)
           assert db.get_task(tid)["status"] == "running"
@@ -80,14 +79,13 @@ jobs:
           child_id = db.create_task("child", parent_id=tid)
           assert str(db.get_task(child_id)["parent_id"]) == tid
 
-          # List
           assert len(db.list_tasks(5)) > 0
-
           print("DB round-trip OK")
           EOF
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Install skill in Claude and run end-to-end smoke test
+  # Job 2: Install skill in Claude and run end-to-end tests.
+  # Uses OpenRouter (Sonnet 4.6) via ANTHROPIC_BASE_URL.
   # Skipped on fork PRs that don't have access to secrets.
   # ──────────────────────────────────────────────────────────────
   skill-test:
@@ -114,6 +112,7 @@ jobs:
       SWARM_PG_DSN: "host=localhost port=5432 dbname=swarm user=swarm password=swarmtest"
       ANTHROPIC_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       ANTHROPIC_BASE_URL: https://openrouter.ai/api/v1
+      CLAUDE_MODEL: anthropic/claude-sonnet-4-6
 
     steps:
       - uses: actions/checkout@v4
@@ -138,29 +137,14 @@ jobs:
       - name: Initialize schema
         run: python3 -c "from claude_swarm import db; db.init_schema(); print('Schema ready')"
 
-      # The skill is already registered via .claude/skills/claude-swarm symlink.
-      # Verify Claude Code can see it before running the test.
-      - name: Verify skill is visible to Claude Code
+      # Skill is registered via .claude/skills/claude-swarm symlink checked into git.
+      - name: Verify skill visible to Claude Code
         run: |
           claude --version
           test -L .claude/skills/claude-swarm
-          echo "Skill registered at .claude/skills/claude-swarm"
+          echo "claude-swarm skill registered"
 
-      # Ask Claude to use the swarm skill to spawn a task and report back.
-      # If the skill triggers correctly, Claude will call swarm-spawn + swarm-wait
-      # and the output of the spawned child task will appear in the response.
-      - name: Run skill smoke test via claude -p
-        run: |
-          OUTPUT=$(claude -p \
-            "Spawn a swarm task that replies with exactly the text: CI_SWARM_OK — then wait for it and tell me the result." \
-            --allowedTools Bash \
-            --no-color 2>&1)
-
-          echo "--- Claude output ---"
-          echo "$OUTPUT"
-          echo "---------------------"
-
-          echo "$OUTPUT" | grep -q "CI_SWARM_OK" \
-            || { echo "FAIL: CI_SWARM_OK not found in output"; exit 1; }
-
-          echo "Skill smoke test PASSED"
+      # Runs both smoke test and FAANG research test.
+      # worker.py picks up CLAUDE_MODEL from the job env via tmux inheritance.
+      - name: Run skill e2e tests
+        run: python3 tests/test_swarm_e2e.py
