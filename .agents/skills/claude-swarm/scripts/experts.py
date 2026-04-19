@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
-"""
-Expert spawn wrappers. Each expert type wraps a task in a system prompt
-that instructs the child claude instance to use its tools appropriately.
-"""
-from claude_swarm.spawn import spawn
+"""Expert spawn wrappers with role-specific system prompts and tool restrictions."""
+from .spawn import spawn
 
 EXPERT_TOOLS = {
     "researcher": ["WebSearch", "WebFetch"],

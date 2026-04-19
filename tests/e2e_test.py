@@ -117,10 +117,8 @@ def test_worker_direct():
     print("\n[7] Worker with real claude (echo task)")
     task_id = db.create_task("Reply with exactly: SWARM_OK")
 
-    import importlib.util
-    worker = os.path.join(os.path.dirname(importlib.util.find_spec("claude_swarm").origin), "worker.py")
     result = subprocess.run(
-        [sys.executable, worker, task_id],
+        [sys.executable, "-m", "claude_swarm.worker", task_id],
         capture_output=True, text=True, timeout=60
     )
     task = db.get_task(task_id)

@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""
-Spawns a child Claude Code instance in a tmux window.
-Usage: swarm-spawn <prompt> [--parent-id <uuid>] [--workdir <path>]
-"""
+"""Spawns a child Claude Code instance in a tmux window."""
 import os
 import argparse
 import subprocess
 
-from claude_swarm import db
-from claude_swarm.config import TMUX_SESSION
+from . import db
+from .config import TMUX_SESSION
 
 WORKER = os.path.join(os.path.dirname(__file__), "worker.py")
 
@@ -27,7 +24,7 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None, tools: list[s
 
     ensure_session()
 
-    cmd = f"python3 {WORKER} {task_id}"
+    cmd = f"python3 -m claude_swarm.worker {task_id}"
     if tools:
         cmd += f" --tools {','.join(tools)}"
     if workdir:
@@ -48,7 +45,7 @@ def main():
     parser.add_argument("prompt")
     parser.add_argument("--parent-id", default=None)
     parser.add_argument("--workdir", default=None)
-    parser.add_argument("--tools", default=None, help="comma-separated allowed tools")
+    parser.add_argument("--tools", default=None)
     args = parser.parse_args()
     tools = args.tools.split(",") if args.tools else None
     spawn(args.prompt, args.parent_id, args.workdir, tools)

@@ -1,22 +1,17 @@
 #!/usr/bin/env python3
-"""
-Blocks until one or more task IDs complete, then prints their outputs.
-Usage: wait.py <task_id> [<task_id> ...]
-"""
+"""Blocks until one or more task IDs complete, then prints their outputs."""
 import sys
-import os
 import select
 
-sys.path.insert(0, os.path.dirname(__file__))
-import db
 import psycopg2
-from config import PG_DSN
+
+from . import db
+from .config import PG_DSN
 
 def wait_for(task_ids: list[str], timeout: int = 300) -> dict:
     pending = set(task_ids)
     results = {}
 
-    # Collect already-done tasks first
     for tid in list(pending):
         task = db.get_task(tid)
         if task["status"] in ("done", "failed"):
@@ -47,13 +42,16 @@ def wait_for(task_ids: list[str], timeout: int = 300) -> dict:
     conn.close()
     return results
 
-if __name__ == "__main__":
+def main():
     task_ids = sys.argv[1:]
     if not task_ids:
-        print("usage: wait.py <task_id> [...]", file=sys.stderr)
+        print("usage: swarm-wait <task_id> [...]", file=sys.stderr)
         sys.exit(1)
 
     results = wait_for(task_ids)
     for tid, task in results.items():
         print(f"--- {tid[:8]} [{task['status']}] ---")
         print(task.get("output") or task.get("error") or "")
+
+if __name__ == "__main__":
+    main()

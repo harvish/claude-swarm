@@ -16,6 +16,8 @@ swarm-spawn  = "claude_swarm.spawn:main"
 swarm-wait   = "claude_swarm.wait:main"
 swarm-expert = "claude_swarm.experts:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["claude_swarm*"]
+[tool.setuptools]
+packages = ["claude_swarm"]
+
+[tool.setuptools.package-dir]
+claude_swarm = ".agents/skills/claude-swarm/scripts"

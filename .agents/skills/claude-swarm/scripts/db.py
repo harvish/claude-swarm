@@ -1,6 +1,6 @@
 import psycopg2
 import psycopg2.extras
-from config import PG_DSN
+from .config import PG_DSN
 
 def connect():
     conn = psycopg2.connect(PG_DSN)
