@@ -12,17 +12,17 @@ Spawns a new non-interactive Claude Code instance in a tmux window. Output is sa
 
 **Plain spawn:**
 ```bash
-python3 /root/docs/swarm/spawn.py "<prompt>"
+swarm-spawn "<prompt>"
 ```
 
 **Expert spawn:**
 ```bash
-python3 /root/docs/swarm/experts.py <type> "<task>"
+swarm-expert <type> "<task>"
 ```
 
 Capture the printed UUID, then wait:
 ```bash
-python3 /root/docs/swarm/wait.py <task_id> [<task_id2> ...]
+swarm-wait <task_id> [<task_id2> ...]
 ```
 
 Tell the user the task ID(s) and that windows are visible in `tmux attach -t swarm`.

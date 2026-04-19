@@ -7,8 +7,7 @@ Displays recent tasks from the swarm PostgreSQL database.
 Run the following Python snippet and display the results in a readable table:
 
 ```python
-import sys; sys.path.insert(0, '/root/docs/swarm')
-import db
+from claude_swarm import db
 tasks = db.list_tasks(20)
 for t in tasks:
     short = str(t['id'])[:8]

@@ -11,9 +11,9 @@ Fetches and displays the full output of a completed task.
 
 Run:
 ```python
-import sys; sys.path.insert(0, '/root/docs/swarm')
-import db, psycopg2
-from config import PG_DSN
+from claude_swarm import db
+from claude_swarm.config import PG_DSN
+import psycopg2
 conn = psycopg2.connect(PG_DSN); conn.autocommit = True
 cur = conn.cursor()
 cur.execute("SELECT * FROM tasks WHERE id::text LIKE %s ORDER BY created_at DESC LIMIT 1", (f"$argument%",))

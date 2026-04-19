@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "claude-swarm"
+version = "0.1.0"
+description = "Multi-agent Claude Code orchestration via PostgreSQL and tmux"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg2-binary>=2.9",
+]
+
+[project.scripts]
+swarm-spawn  = "claude_swarm.spawn:main"
+swarm-wait   = "claude_swarm.wait:main"
+swarm-expert = "claude_swarm.experts:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["claude_swarm*"]
