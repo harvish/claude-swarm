@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 Runs a single Claude Code task non-interactively, saves output to DB.
-Usage: worker.py <task_id> [--tools Tool1,Tool2]
+Usage: invoked by spawn.py via tmux; not called directly.
 """
 import sys
-import subprocess
 import os
+import subprocess
 
-sys.path.insert(0, os.path.dirname(__file__))
-import db
+from . import db
 
 def run(task_id: str, allowed_tools: list[str] = None):
     task = db.get_task(task_id)
@@ -17,6 +16,9 @@ def run(task_id: str, allowed_tools: list[str] = None):
     cmd = ["claude", "-p", task["prompt"]]
     if allowed_tools:
         cmd += ["--allowedTools", ",".join(allowed_tools)]
+    model = os.environ.get("CLAUDE_MODEL")
+    if model:
+        cmd += ["--model", model]
 
     try:
         result = subprocess.run(
@@ -39,7 +41,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("task_id")
-    parser.add_argument("--tools", default=None, help="comma-separated allowed tools")
+    parser.add_argument("--tools", default=None)
     args = parser.parse_args()
     tools = args.tools.split(",") if args.tools else None
     run(args.task_id, tools)

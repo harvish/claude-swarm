@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Job 1: Validate skill structure + DB layer (no secrets needed)
+  # ──────────────────────────────────────────────────────────────
+  validate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: swarm
+          POSTGRES_PASSWORD: swarmtest
+          POSTGRES_DB: swarm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SWARM_PG_DSN: "host=localhost port=5432 dbname=swarm user=swarm password=swarmtest"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python package
+        run: pip install -e .
+
+      - name: Validate skill structure
+        run: |
+          test -L .claude/skills/claude-swarm \
+            || { echo "ERROR: .claude/skills/claude-swarm symlink missing"; exit 1; }
+          test -f .agents/skills/claude-swarm/SKILL.md \
+            || { echo "ERROR: SKILL.md missing"; exit 1; }
+          python3 - <<'EOF'
+          content = open(".agents/skills/claude-swarm/SKILL.md").read()
+          assert content.startswith("---"), "SKILL.md missing YAML frontmatter"
+          import re
+          front = content.split("---")[1]
+          assert re.search(r"^name:", front, re.M), "SKILL.md missing 'name:'"
+          assert re.search(r"^description:", front, re.M), "SKILL.md missing 'description:'"
+          print("SKILL.md structure OK")
+          EOF
+
+      - name: DB round-trip test
+        run: |
+          python3 - <<'EOF'
+          from claude_swarm import db
+
+          db.init_schema()
+
+          # Basic lifecycle
+          tid = db.create_task("ci validation task")
+          assert db.get_task(tid)["status"] == "pending"
+
+          db.set_running(tid)
+          assert db.get_task(tid)["status"] == "running"
+
+          db.set_done(tid, "ok")
+          task = db.get_task(tid)
+          assert task["status"] == "done"
+          assert task["output"] == "ok"
+
+          # Parent-child
+          child_id = db.create_task("child", parent_id=tid)
+          assert str(db.get_task(child_id)["parent_id"]) == tid
+
+          assert len(db.list_tasks(5)) > 0
+          print("DB round-trip OK")
+          EOF
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 2: Install skill in Claude and run end-to-end tests.
+  # Uses OpenRouter (Sonnet 4.6) via ANTHROPIC_BASE_URL.
+  # Skipped on fork PRs that don't have access to secrets.
+  # ──────────────────────────────────────────────────────────────
+  skill-test:
+    runs-on: ubuntu-latest
+    needs: validate
+    if: ${{ vars.RUN_SKILL_TEST == 'true' || github.event_name == 'push' }}
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: swarm
+          POSTGRES_PASSWORD: swarmtest
+          POSTGRES_DB: swarm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SWARM_PG_DSN: "host=localhost port=5432 dbname=swarm user=swarm password=swarmtest"
+      ANTHROPIC_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      ANTHROPIC_BASE_URL: https://openrouter.ai/api/v1
+      CLAUDE_MODEL: anthropic/claude-sonnet-4-6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y tmux
+
+      - name: Install Python package
+        run: pip install -e .
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Initialize schema
+        run: python3 -c "from claude_swarm import db; db.init_schema(); print('Schema ready')"
+
+      # Skill is registered via .claude/skills/claude-swarm symlink checked into git.
+      - name: Verify skill visible to Claude Code
+        run: |
+          claude --version
+          test -L .claude/skills/claude-swarm
+          echo "claude-swarm skill registered"
+
+      # Runs both smoke test and FAANG research test.
+      # worker.py picks up CLAUDE_MODEL from the job env via tmux inheritance.
+      - name: Run skill e2e tests
+        run: python3 tests/test_swarm_e2e.py

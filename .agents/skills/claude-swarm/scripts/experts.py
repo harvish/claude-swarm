@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
-"""
-Expert spawn wrappers. Each expert type wraps a task in a system prompt
-that instructs the child claude instance to use its tools appropriately.
-"""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(__file__))
-from spawn import spawn
+"""Expert spawn wrappers with role-specific system prompts and tool restrictions."""
+from .spawn import spawn
 
 EXPERT_TOOLS = {
     "researcher": ["WebSearch", "WebFetch"],
@@ -77,7 +70,7 @@ def spawn_expert(expert_type: str, task: str, parent_id: str = None, workdir: st
     return spawn(prompt, parent_id=parent_id, workdir=workdir, tools=tools)
 
 
-if __name__ == "__main__":
+def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("expert_type", choices=list(EXPERT_PROMPTS))
@@ -87,3 +80,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     task_id = spawn_expert(args.expert_type, args.task, args.parent_id, args.workdir)
     print(task_id)
+
+if __name__ == "__main__":
+    main()

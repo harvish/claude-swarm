@@ -9,11 +9,10 @@ import time
 import subprocess
 import threading
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import db
-from wait import wait_for
-from spawn import spawn
-from config import TMUX_SESSION
+from claude_swarm import db
+from claude_swarm.wait import wait_for
+from claude_swarm.spawn import spawn
+from claude_swarm.config import TMUX_SESSION
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
@@ -118,9 +117,8 @@ def test_worker_direct():
     print("\n[7] Worker with real claude (echo task)")
     task_id = db.create_task("Reply with exactly: SWARM_OK")
 
-    worker = os.path.join(os.path.dirname(__file__), "..", "worker.py")
     result = subprocess.run(
-        [sys.executable, worker, task_id],
+        [sys.executable, "-m", "claude_swarm.worker", task_id],
         capture_output=True, text=True, timeout=60
     )
     task = db.get_task(task_id)

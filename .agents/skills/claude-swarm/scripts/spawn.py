@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""
-Spawns a child Claude Code instance in a tmux window.
-Usage: spawn.py <prompt> [--parent-id <uuid>] [--workdir <path>]
-"""
-import sys
+"""Spawns a child Claude Code instance in a tmux window."""
 import os
 import argparse
 import subprocess
 
-sys.path.insert(0, os.path.dirname(__file__))
-import db
-from config import TMUX_SESSION
+from . import db
+from .config import TMUX_SESSION
 
 WORKER = os.path.join(os.path.dirname(__file__), "worker.py")
 
@@ -29,7 +24,7 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None, tools: list[s
 
     ensure_session()
 
-    cmd = f"python3 {WORKER} {task_id}"
+    cmd = f"python3 -m claude_swarm.worker {task_id}"
     if tools:
         cmd += f" --tools {','.join(tools)}"
     if workdir:
@@ -45,12 +40,15 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None, tools: list[s
     print(task_id)
     return task_id
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("prompt")
     parser.add_argument("--parent-id", default=None)
     parser.add_argument("--workdir", default=None)
-    parser.add_argument("--tools", default=None, help="comma-separated allowed tools")
+    parser.add_argument("--tools", default=None)
     args = parser.parse_args()
     tools = args.tools.split(",") if args.tools else None
     spawn(args.prompt, args.parent_id, args.workdir, tools)
+
+if __name__ == "__main__":
+    main()
