@@ -22,7 +22,10 @@ Skills are picked up automatically by Claude Code after installation. Each skill
 
 ## Contributing
 
-1. Fork the repo
-2. Add your skill under `.agents/skills/<skill-name>/` with a `SKILL.md` and `README.md`
-3. List it in this file under **Skills**
-4. Open a pull request
+There are a few ways to contribute:
+
+- **Add a new skill** — create `.agents/skills/<skill-name>/` with a `SKILL.md` and `README.md`, then list it above
+- **Add expert configurations** — extend an existing skill with new expert roles under its `scripts/` directory
+- **Customize a skill** — fork and adapt any skill's `SKILL.md` or supporting scripts to fit your workflow
+
+Open a pull request with your changes.
