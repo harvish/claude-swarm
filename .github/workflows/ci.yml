@@ -84,14 +84,41 @@ jobs:
           EOF
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Install skill in Claude and run end-to-end tests.
+  # Job 2: Check whether the OpenRouter secret is available.
+  # Exposes a boolean output used by skill-test to decide whether
+  # to run. Secrets cannot appear in job-level if: expressions,
+  # so we surface the value through a step output instead.
+  # ──────────────────────────────────────────────────────────────
+  check-secrets:
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      has-api-key: ${{ steps.check.outputs.has-api-key }}
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - id: check
+        run: |
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            echo "has-api-key=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "has-api-key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OPENROUTER_API_KEY not set — skipping e2e tests"
+          fi
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 3: Install skill in Claude and run end-to-end tests.
   # Uses OpenRouter (Sonnet 4.6) via ANTHROPIC_BASE_URL.
-  # Skipped on fork PRs that don't have access to secrets.
+  # Skipped when OPENROUTER_API_KEY secret is not configured.
   # ──────────────────────────────────────────────────────────────
   skill-test:
     runs-on: ubuntu-latest
-    needs: validate
-    if: ${{ vars.RUN_SKILL_TEST == 'true' || github.event_name == 'push' }}
+    needs: [validate, check-secrets]
+    if: >-
+      ${{
+        (vars.RUN_SKILL_TEST == 'true' || github.event_name == 'push') &&
+        needs.check-secrets.outputs.has-api-key == 'true'
+      }}
 
     services:
       postgres:
