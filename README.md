@@ -1,42 +1,28 @@
-# claude-swarm
+# claude-skills
 
-An agent swarm skill for Claude Code, built entirely on the default skills spec supported by Claude — no external infrastructure, no platform-specific tools.
+A collection of agent skills for Claude Code, installable via [skills.sh](https://skills.sh).
 
-> **Scope**: Currently targets Claude Code. Future plan is to expand to all clients that support the skills spec.
+## Skills
 
-## What it does
+### claude-swarm
 
-The `claude-swarm` skill lets Claude orchestrate parallel child agents from within a single session. Instead of working sequentially, Claude spawns specialized workers (researcher, analyst, coder) to run concurrently, then synthesizes their results.
-
-## Install
+Orchestrate parallel Claude Code agents for research, coding, and analysis. Spawns specialized workers (researcher, analyst, coder) that run concurrently and report back to the parent session.
 
 ```bash
 npx skills add harvish/claude-swarm
 ```
 
+[Details](.agents/skills/claude-swarm/README.md)
+
+---
+
 ## Usage
 
-Once installed, Claude picks up the skill automatically. You can also invoke it explicitly:
+Skills are picked up automatically by Claude Code after installation. Each skill can also be invoked explicitly via its slash command (e.g. `/claude-swarm`).
 
-```
-/claude-swarm
-```
+## Contributing
 
-Trigger phrases that cause Claude to auto-activate swarm mode:
-
-- "research X and Y in parallel"
-- "spawn agents for …"
-- any multi-track task with independent subtasks
-
-## Skill structure
-
-```
-.agents/skills/claude-swarm/
-├── SKILL.md              # skill definition (loaded by Claude Code)
-├── scripts/              # CLI helpers: swarm-spawn, swarm-wait, swarm-expert
-└── references/setup.md   # first-run onboarding guide
-```
-
-## Publishing
-
-This skill is listed on [skills.sh](https://skills.sh). The `SKILL.md` lives in `.agents/skills/claude-swarm/`, a standard discovery path supported by the skills.sh registry.
+1. Fork the repo
+2. Add your skill under `.agents/skills/<skill-name>/` with a `SKILL.md` and `README.md`
+3. List it in this file under **Skills**
+4. Open a pull request
