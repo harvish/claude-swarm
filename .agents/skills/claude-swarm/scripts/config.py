@@ -1,4 +1,6 @@
 import os
+import pathlib
+import tempfile
 
 _dsn = os.environ.get("SWARM_PG_DSN")
 if not _dsn:
@@ -11,3 +13,8 @@ if not _dsn:
 
 PG_DSN = _dsn
 TMUX_SESSION = os.environ.get("SWARM_TMUX_SESSION", "swarm")
+
+_LOG_DIR = pathlib.Path(tempfile.gettempdir())
+
+def log_path(task_id: str) -> pathlib.Path:
+    return _LOG_DIR / f"swarm-{task_id}.log"

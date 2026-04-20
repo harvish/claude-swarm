@@ -66,4 +66,10 @@ If this fails:
 Setup is complete. They can now use:
 - `swarm-spawn "<prompt>"` — run any task in a child Claude instance
 - `swarm-expert researcher "<topic>"` — spawn a researcher agent
+- `swarm-expert analyst "<subject>"` — spawn an analyst agent
+- `swarm-expert coder "<task>"` — spawn a coding agent
+- `swarm-wait <task_id> [...]` — block until tasks complete, print results
+- `swarm-logs <task_id>` — stream live output from a running task
+- `swarm-cancel <task_id>` — cancel a running task
+- `swarm-clean` — close tmux windows for completed/failed tasks
 - `/claude-swarm` — access all swarm commands via the skill

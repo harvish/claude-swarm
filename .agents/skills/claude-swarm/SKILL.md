@@ -7,15 +7,22 @@ description: Orchestrate parallel Claude Code agents for research, coding, and a
 
 Orchestrates child Claude Code instances via PostgreSQL + tmux. The parent agent spawns children, waits for their results via LISTEN/NOTIFY, and synthesizes the findings.
 
-## First Run: Onboarding
+## Checking Configuration
 
-Before using swarm commands, verify setup by checking for `SWARM_PG_DSN` in the environment. If it's missing, run the onboarding flow in `references/setup.md` — it asks for the user's PostgreSQL connection details, saves the config, installs dependencies, and initializes the schema. Do this automatically without asking the user if any swarm command fails with a connection error.
+Before running any swarm command, verify `SWARM_PG_DSN` is set in the environment:
+
+```bash
+python3 -c "from claude_swarm.config import PG_DSN; print('DSN:', PG_DSN[:30], '...')"
+```
+
+If the variable is missing or the connection fails, run the onboarding flow in `references/setup.md` automatically — ask the user for their PostgreSQL DSN, save it, install the package, and initialize the schema. Do not ask the user to do this manually.
 
 ## Spawning Tasks
 
 **Generic task** — any prompt, unrestricted tools:
 ```bash
-swarm-spawn "<prompt>"
+task_id=$(swarm-spawn "<prompt>")
+# stderr: [swarm] spawned generic task a1b2c3d4  (tmux attach -t swarm to watch live)
 ```
 
 **Expert task** — wraps the prompt in a role-specific system prompt with restricted tools:
@@ -30,7 +37,7 @@ Capture the printed UUID from each spawn, then wait for completion:
 swarm-wait <task_id> [<task_id2> <task_id3> ...]
 ```
 
-`swarm-wait` blocks until all given tasks complete (or 300s timeout), then prints each result.
+`swarm-wait` shows a live status line while waiting, then prints a formatted result block for each task. Tasks that time out (300s default) are reported explicitly.
 
 ### Passing context
 - `--workdir <path>` — child works in that directory
@@ -47,6 +54,28 @@ swarm-wait <task_id> [<task_id2> <task_id3> ...]
 | Need working code for a sub-problem | `swarm-expert coder` |
 
 When you would normally do a WebSearch or WebFetch inline, spawn a researcher instead and wait for its output — this keeps the parent session focused on synthesis.
+
+## Watching Task Output Live
+
+While a task is running, stream its output in real time:
+
+```bash
+swarm-logs <task_id>
+```
+
+`swarm-logs` waits up to 5s for the task to start, then tails the log line-by-line until the task completes. Combine with spawn for a "fire and watch" workflow:
+
+```bash
+task_id=$(swarm-spawn "research FAANG stocks")
+swarm-logs "$task_id"
+# ... streams output live, exits when done ...
+swarm-wait "$task_id"   # grab the stored result
+```
+
+You can also attach to the tmux session to see all windows at once:
+```bash
+tmux attach -t swarm   # or $SWARM_TMUX_SESSION if customized
+```
 
 ## Checking Status
 
@@ -82,9 +111,16 @@ row = cur.fetchone()
 
 Display the full `output` or `error` field along with status, prompt, and timing.
 
-## Tasks visible in tmux
+## Cancelling and Cleaning Up
 
-Child Claude instances run in tmux windows. To watch them live:
+Cancel a running task (kills its tmux window and marks it failed in the DB):
 ```bash
-tmux attach -t swarm   # or $SWARM_TMUX_SESSION if customized
+swarm-cancel <task_id>
 ```
+
+Close all tmux windows for tasks that have already completed or failed:
+```bash
+swarm-clean
+```
+
+`swarm-clean` cross-references the DB with open tmux windows and kills only the matching ones, leaving any still-running windows untouched.

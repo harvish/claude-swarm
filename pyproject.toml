@@ -15,6 +15,9 @@ dependencies = [
 swarm-spawn  = "claude_swarm.spawn:main"
 swarm-wait   = "claude_swarm.wait:main"
 swarm-expert = "claude_swarm.experts:main"
+swarm-logs   = "claude_swarm.logs:main"
+swarm-cancel = "claude_swarm.cancel:main"
+swarm-clean  = "claude_swarm.clean:main"
 
 [tool.setuptools]
 packages = ["claude_swarm"]

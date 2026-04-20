@@ -67,19 +67,24 @@ def spawn_expert(expert_type: str, task: str, parent_id: str = None, workdir: st
         raise ValueError(f"Unknown expert type '{expert_type}'. Available: {list(EXPERT_PROMPTS)}")
     prompt = template.format(task=task)
     tools = EXPERT_TOOLS.get(expert_type)
-    return spawn(prompt, parent_id=parent_id, workdir=workdir, tools=tools)
+    return spawn(prompt, parent_id=parent_id, workdir=workdir, tools=tools, task_type=expert_type)
 
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("expert_type", choices=list(EXPERT_PROMPTS))
-    parser.add_argument("task")
-    parser.add_argument("--parent-id", default=None)
-    parser.add_argument("--workdir", default=None)
-    args = parser.parse_args()
-    task_id = spawn_expert(args.expert_type, args.task, args.parent_id, args.workdir)
-    print(task_id)
+    from .errors import handle_connection_error
+
+    @handle_connection_error
+    def _main():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("expert_type", choices=list(EXPERT_PROMPTS))
+        parser.add_argument("task")
+        parser.add_argument("--parent-id", default=None)
+        parser.add_argument("--workdir", default=None)
+        args = parser.parse_args()
+        spawn_expert(args.expert_type, args.task, args.parent_id, args.workdir)
+
+    _main()
 
 if __name__ == "__main__":
     main()
