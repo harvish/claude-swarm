@@ -144,10 +144,9 @@ jobs:
       ANTHROPIC_API_KEY: ""
       ANTHROPIC_AUTH_TOKEN: ${{ secrets.OPENROUTER_API_KEY }}
       ANTHROPIC_BASE_URL: https://openrouter.ai/api
-      ANTHROPIC_DEFAULT_SONNET_MODEL: anthropic/claude-sonnet-4.6
+      ANTHROPIC_DEFAULT_SONNET_MODEL: anthropic/claude-haiku-4.5
       ANTHROPIC_DEFAULT_HAIKU_MODEL: anthropic/claude-haiku-4.5
-      ANTHROPIC_DEFAULT_OPUS_MODEL: anthropic/claude-opus-4.7
-      CLAUDE_MAX_TOKENS: "4096"
+      ANTHROPIC_DEFAULT_OPUS_MODEL: anthropic/claude-haiku-4.5
 
     steps:
       - uses: actions/checkout@v4

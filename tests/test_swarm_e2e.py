@@ -35,9 +35,6 @@ def run_claude(prompt: str, timeout: int = 180) -> str:
     model = os.environ.get("CLAUDE_MODEL")
     if model:
         cmd += ["--model", model]
-    max_tokens = os.environ.get("CLAUDE_MAX_TOKENS")
-    if max_tokens:
-        cmd += ["--max-tokens", max_tokens]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return result.stdout + result.stderr
 
