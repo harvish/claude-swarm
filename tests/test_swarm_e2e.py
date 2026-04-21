@@ -27,11 +27,11 @@ def check(name, condition, detail=""):
 
 
 def run_claude(prompt: str, timeout: int = 180) -> str:
-    model = os.environ.get("CLAUDE_MODEL", "anthropic/claude-sonnet-4.6")
-    result = subprocess.run(
-        ["claude", "-p", prompt, "--allowedTools", "Bash", "--model", model],
-        capture_output=True, text=True, timeout=timeout,
-    )
+    cmd = ["claude", "-p", prompt, "--allowedTools", "Bash"]
+    model = os.environ.get("CLAUDE_MODEL")
+    if model:
+        cmd += ["--model", model]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return result.stdout + result.stderr
 
 
