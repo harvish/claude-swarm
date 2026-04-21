@@ -13,6 +13,9 @@ from scripts import db
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
+SKIP = "\033[33mSKIP\033[0m"
+
+API_KEY_SET = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
 
 
 def check(name, condition, detail=""):
@@ -37,6 +40,9 @@ def run_claude(prompt: str, timeout: int = 180) -> str:
 def test_smoke():
     """Ask Claude to spawn a single task via swarm-spawn and verify it completes."""
     print("\n[1] Smoke — spawn and wait via bash wrappers")
+    if not API_KEY_SET:
+        print(f"  {SKIP}  ANTHROPIC_API_KEY not set — skipping LLM tests")
+        return True
 
     before = len(db.list_tasks(100))
     output = run_claude(
@@ -54,6 +60,9 @@ def test_smoke():
 def test_bash_wrapper_spawn():
     """Directly invoke swarm-spawn and swarm-wait as bash commands and verify output."""
     print("\n[2] Bash wrapper — swarm-spawn + swarm-wait direct invocation")
+    if not API_KEY_SET:
+        print(f"  {SKIP}  ANTHROPIC_API_KEY not set — skipping LLM tests")
+        return True
 
     result = subprocess.run(
         ["swarm-spawn", "Reply with exactly: WRAPPER_OK"],
@@ -82,6 +91,9 @@ def test_faang_research():
     Verifies tasks are dispatched through the swarm and output covers expected companies.
     """
     print("\n[3] FAANG research — parallel researcher swarm")
+    if not API_KEY_SET:
+        print(f"  {SKIP}  ANTHROPIC_API_KEY not set — skipping LLM tests")
+        return True
 
     before = len(db.list_tasks(200))
 
