@@ -30,7 +30,18 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None,
     scripts_parent = os.path.dirname(os.path.dirname(__file__))
     tools_arg = f", allowed_tools={repr(tools)}" if tools else ""
     from .config import PG_DSN, TMUX_SESSION as _TS
-    env_prefix = f"SWARM_PG_DSN={repr(PG_DSN)} SWARM_TMUX_SESSION={repr(_TS)}"
+    # Forward auth + model env vars so child claude instances have credentials
+    _AUTH_VARS = [
+        "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    ]
+    env_parts = [f"SWARM_PG_DSN={repr(PG_DSN)}", f"SWARM_TMUX_SESSION={repr(_TS)}"]
+    for var in _AUTH_VARS:
+        val = os.environ.get(var)
+        if val is not None:
+            env_parts.append(f"{var}={repr(val)}")
+    env_prefix = " ".join(env_parts)
     cmd = (
         f"{env_prefix} python3 -c \""
         f"import sys; sys.path.insert(0, '{scripts_parent}'); "
