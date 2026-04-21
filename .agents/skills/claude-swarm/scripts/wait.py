@@ -3,6 +3,7 @@
 import sys
 import select
 import time
+import datetime
 
 import psycopg2
 
@@ -10,73 +11,217 @@ from . import db
 from .config import PG_DSN
 from .errors import handle_connection_error
 
-def wait_for(task_ids: list[str], timeout: int = 300) -> dict:
-    pending = set(task_ids)
-    results = {}
+_STATUS_STYLE = {
+    "pending": ("yellow", "⏳"),
+    "running": ("cyan",   "⚙ "),
+    "done":    ("green",  "✓ "),
+    "failed":  ("red",    "✗ "),
+    "timeout": ("red",    "✗ "),
+}
 
-    for tid in list(pending):
-        task = db.get_task(tid)
-        if task["status"] in ("done", "failed"):
-            results[tid] = task
+def _style(status):
+    return _STATUS_STYLE.get(status, ("white", "? "))
+
+
+def _elapsed(task):
+    if not task.get("started_at"):
+        return ""
+    end = task.get("completed_at") or datetime.datetime.now(datetime.timezone.utc)
+    secs = int((end - task["started_at"]).total_seconds())
+    return f"{secs}s"
+
+
+def _last_log_line(task_id: str) -> str:
+    """Return last non-empty line from the task's live log file, if it exists."""
+    try:
+        from .config import log_path
+        lf = log_path(task_id)
+        if not lf.exists():
+            return ""
+        # Read last 2 KB to get the tail without loading the whole file
+        with lf.open("rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 2048))
+            tail = f.read().decode("utf-8", errors="replace")
+        lines = [l.strip() for l in tail.splitlines() if l.strip()]
+        return lines[-1][:80] if lines else ""
+    except Exception:
+        return ""
+
+
+def _make_table(task_ids, task_cache, pending, start_mono, title="Tasks"):
+    from rich.table import Table
+    from rich.text import Text
+    from rich import box as rbox
+
+    done_count  = sum(1 for tid in task_ids if task_cache.get(tid, {}).get("status") == "done")
+    fail_count  = sum(1 for tid in task_ids if task_cache.get(tid, {}).get("status") == "failed")
+    total       = len(task_ids)
+    wall        = int(time.monotonic() - start_mono)
+
+    header = f"{title}  {done_count}/{total} done"
+    if fail_count:
+        header += f"  {fail_count} failed"
+    if pending:
+        header += f"  —  {wall}s"
+
+    show_preview = bool(pending)  # only show live preview while tasks are running
+
+    table = Table(
+        title=header,
+        title_justify="left",
+        box=rbox.SIMPLE_HEAD,
+        show_header=True,
+        padding=(0, 1),
+        title_style="bold",
+    )
+    table.add_column("",        width=2)
+    table.add_column("ID",      style="dim", width=9)
+    table.add_column("Status",  width=9)
+    table.add_column("Elapsed", width=8, justify="right")
+    table.add_column("Prompt / Last output", no_wrap=True)
+
+    for tid in task_ids:
+        t      = task_cache.get(tid) or {}
+        status = t.get("status", "pending")
+        color, icon = _style(status)
+
+        # spinner for running tasks
+        if status == "running" and pending:
+            spinner_frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
+            icon = spinner_frames[int(time.monotonic() * 8) % len(spinner_frames)]
+
+        # show live log preview while running, prompt otherwise
+        if status == "running" and show_preview:
+            preview = _last_log_line(tid)
+            label   = Text(preview or "…", style="italic dim")
+        else:
+            prompt  = (t.get("prompt") or "")[:65].split("\n")[0]
+            label   = Text(prompt, style="dim")
+
+        table.add_row(
+            Text(icon,              style=color),
+            Text(tid[:8],           style="dim"),
+            Text(status,            style=color),
+            Text(_elapsed(t) or "", style="dim"),
+            label,
+        )
+    return table
+
+
+def wait_for(task_ids: list[str], timeout: int = 300) -> dict:
+    task_cache = {}
+    pending    = set(task_ids)
+
+    # seed cache and fast-path already-done tasks
+    for tid in task_ids:
+        t = db.get_task(tid)
+        task_cache[tid] = t
+        if t["status"] in ("done", "failed"):
             pending.discard(tid)
 
     if not pending:
-        return results
+        return task_cache
 
     conn = psycopg2.connect(PG_DSN)
     conn.autocommit = True
     cur = conn.cursor()
     cur.execute("LISTEN task_complete")
 
-    is_tty = sys.stderr.isatty()
     start = time.monotonic()
     deadline = start + timeout
 
-    while pending:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-
-        wait = min(1.0, remaining)
+    def _poll():
+        wait = min(0.5, max(0.0, deadline - time.monotonic()))
         ready = select.select([conn], [], [], wait)[0]
-
         if ready:
             conn.poll()
             for notify in conn.notifies:
                 tid = notify.payload
                 if tid in pending:
-                    results[tid] = db.get_task(tid)
+                    task_cache[tid] = db.get_task(tid)
                     pending.discard(tid)
             conn.notifies.clear()
-
-        # re-check DB for any tasks that may have completed without notify
+        # fallback DB poll for missed notifies
         for tid in list(pending):
-            task = db.get_task(tid)
-            if task["status"] in ("done", "failed"):
-                results[tid] = task
+            t = db.get_task(tid)
+            task_cache[tid] = t
+            if t["status"] in ("done", "failed"):
                 pending.discard(tid)
 
-        if is_tty and pending:
-            elapsed = int(time.monotonic() - start)
-            statuses = {}
-            for tid in pending:
-                t = db.get_task(tid)
-                statuses[t["status"]] = statuses.get(t["status"], 0) + 1
-            parts = "  ".join(f"{v} {k}" for k, v in statuses.items())
-            sys.stderr.write(f"\r[swarm] waiting: {parts}  ({elapsed}s){'':<10}")
-            sys.stderr.flush()
+    is_tty = sys.stderr.isatty()
 
     if is_tty:
-        sys.stderr.write("\r" + " " * 60 + "\r")
-        sys.stderr.flush()
+        try:
+            from rich.live   import Live
+            from rich.console import Console
+            console = Console(stderr=True)
+            with Live(console=console, refresh_per_second=4, transient=False) as live:
+                while pending and time.monotonic() < deadline:
+                    _poll()
+                    live.update(_make_table(task_ids, task_cache, pending, start))
+                # final render — all tasks settled, table stays visible
+                live.update(_make_table(task_ids, task_cache, pending, start))
+        except ImportError:
+            while pending and time.monotonic() < deadline:
+                _poll()
+                elapsed = int(time.monotonic() - start)
+                sys.stderr.write(
+                    f"\r[swarm] {len(task_ids)-len(pending)}/{len(task_ids)} done  ({elapsed}s)      "
+                )
+                sys.stderr.flush()
+            sys.stderr.write("\n")
+    else:
+        while pending and time.monotonic() < deadline:
+            _poll()
 
     cur.close()
     conn.close()
 
     for tid in pending:
-        results[tid] = {"status": "timeout", "output": None, "error": "timed out"}
+        task_cache[tid] = {"status": "timeout", "output": None, "error": "timed out",
+                           "prompt": task_cache.get(tid, {}).get("prompt", ""),
+                           "started_at": None, "completed_at": None}
 
-    return results
+    return task_cache
+
+
+def _print_results(task_ids, results):
+    try:
+        from rich.console  import Console
+        from rich.panel    import Panel
+        from rich.markdown import Markdown
+        from rich.text     import Text
+        console = Console()
+        console.print()  # blank line after the table
+        for tid in task_ids:
+            task = results.get(tid)
+            if not task:
+                continue
+            status = task["status"]
+            color, icon = _style(status)
+            title = Text(f"{icon} {tid[:8]}  [{status}]  {_elapsed(task)}", style=f"bold {color}")
+            body  = task.get("output") or task.get("error") or ""
+            console.print(Panel(
+                Markdown(body) if body else Text("(no output)", style="dim"),
+                title=title,
+                border_style=color,
+            ))
+    except ImportError:
+        sep = "=" * 60
+        for tid in task_ids:
+            task = results.get(tid)
+            if not task:
+                continue
+            print(sep)
+            print(f"  {tid[:8]}  [{task['status']}]  {_elapsed(task)}")
+            print(sep)
+            body = task.get("output") or task.get("error") or ""
+            if body:
+                print(body)
+            print()
+
 
 @handle_connection_error
 def main():
@@ -84,21 +229,9 @@ def main():
     if not task_ids:
         print("usage: swarm-wait <task_id> [...]", file=sys.stderr)
         sys.exit(1)
-
     results = wait_for(task_ids)
-    sep = "=" * 60
-    for tid in task_ids:
-        task = results.get(tid)
-        if not task:
-            continue
-        status = task["status"]
-        print(sep)
-        print(f"  {tid[:8]}  [{status}]")
-        print(sep)
-        body = task.get("output") or task.get("error") or ""
-        if body:
-            print(body)
-        print()
+    _print_results(task_ids, results)
+
 
 if __name__ == "__main__":
     main()

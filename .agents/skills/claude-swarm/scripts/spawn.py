@@ -27,9 +27,16 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None,
 
     ensure_session()
 
-    cmd = f"python3 -m claude_swarm.worker {task_id}"
-    if tools:
-        cmd += f" --tools {','.join(tools)}"
+    scripts_parent = os.path.dirname(os.path.dirname(__file__))
+    tools_arg = f", allowed_tools={repr(tools)}" if tools else ""
+    from .config import PG_DSN, TMUX_SESSION as _TS
+    env_prefix = f"SWARM_PG_DSN={repr(PG_DSN)} SWARM_TMUX_SESSION={repr(_TS)}"
+    cmd = (
+        f"{env_prefix} python3 -c \""
+        f"import sys; sys.path.insert(0, '{scripts_parent}'); "
+        f"from scripts.worker import run; "
+        f"run('{task_id}'{tools_arg})\""
+    )
     if workdir:
         cmd = f"cd {workdir} && {cmd}"
     cmd += f"; echo '[task {short} finished]'; read"

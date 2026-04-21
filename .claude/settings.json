@@ -1,0 +1,5 @@
+{
+  "env": {
+    "SWARM_PG_DSN": "host=192.168.2.61 port=5432 dbname=swarm user=swarm password=swarm"
+  }
+}

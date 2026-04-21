@@ -1,75 +1,147 @@
-# Claude Swarm Setup
+# Claude Swarm — Onboarding
 
-Run these steps once before using any swarm commands. You can re-run safely — all steps are idempotent.
+Run once before using any swarm commands. All steps are idempotent — safe to re-run.
 
-## 1. Get PostgreSQL connection details
+---
 
-Ask the user for their PostgreSQL connection string. They can provide it as:
+## Step 1 — Get PostgreSQL connection details
 
-- A full libpq DSN: `host=db.example.com port=5432 dbname=swarm user=swarm password=secret`
-- A URL: `postgresql://swarm:secret@db.example.com:5432/swarm`
+Ask the user for their PostgreSQL DSN. Accept either format:
 
-If they need a local Postgres for testing, suggest: `host=localhost port=5432 dbname=swarm user=swarm password=swarm`
+- libpq: `host=db.example.com port=5432 dbname=swarm user=swarm password=secret`
+- URL: `postgresql://user:password@host:5432/dbname`
 
-## 2. Install the Python package
+**No Postgres yet?** Suggest the default for a local instance:
+```
+host=localhost port=5432 dbname=swarm user=swarm password=swarm
+```
 
-From the project root, install the swarm package and its CLI commands:
+Store it as `DSN` for the steps below.
+
+---
+
+## Step 2 — Install Python dependencies
 
 ```bash
-pip install -e .
+pip install psycopg2-binary rich inotify_simple -q
 ```
 
-This puts `swarm-spawn`, `swarm-wait`, and `swarm-expert` on `$PATH`.
+No package install needed — swarm commands run directly from the skill scripts.
 
-## 3. Save the connection to project settings
+---
 
-Run this Python snippet (replace `<dsn>` with the user's connection string):
+## Step 3 — Create bash wrappers
 
-```python
-import json, pathlib
+Creates `swarm-*` commands in `~/.local/bin` so they work from any shell.
+Run from the project root (where `.agents/` lives):
 
-dsn = "<dsn>"
-settings_path = pathlib.Path(".claude/settings.json")
-settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
-settings.setdefault("env", {})["SWARM_PG_DSN"] = dsn
-settings_path.parent.mkdir(exist_ok=True)
-settings_path.write_text(json.dumps(settings, indent=2))
-print(f"Saved SWARM_PG_DSN to .claude/settings.json")
+```bash
+SWARM_ROOT="$(pwd)"
+SCRIPTS_PARENT="$SWARM_ROOT/.agents/skills/claude-swarm"
+
+mkdir -p ~/.local/bin
+
+for cmd in spawn wait expert logs cancel clean status doctor; do
+cat > ~/.local/bin/swarm-$cmd << WRAPPER
+#!/usr/bin/env bash
+export SWARM_PG_DSN="\${SWARM_PG_DSN:-$DSN}"
+exec python3 -c "
+import sys
+sys.path.insert(0, '$SCRIPTS_PARENT')
+from scripts.\${cmd} import main
+main()
+" "\$@"
+WRAPPER
+chmod +x ~/.local/bin/swarm-$cmd
+done
+
+echo "Created: $(ls ~/.local/bin/swarm-* | xargs -n1 basename | tr '\n' ' ')"
 ```
 
-This persists the DSN across Claude Code sessions via the project's environment config.
+---
 
-Optional — customize the tmux session name (default is `swarm`):
-```python
-settings["env"]["SWARM_TMUX_SESSION"] = "my-swarm"
-settings_path.write_text(json.dumps(settings, indent=2))
+## Step 4 — Persist DSN and PATH in shell profile
+
+```bash
+grep -q 'SWARM_PG_DSN' ~/.bashrc || cat >> ~/.bashrc << EOF
+
+# Claude Swarm
+export SWARM_PG_DSN="$DSN"
+EOF
+
+grep -q '\.local/bin' ~/.bashrc || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
+# Apply to current session
+export PATH="$HOME/.local/bin:$PATH"
+export SWARM_PG_DSN="$DSN"
 ```
 
-## 4. Verify connection and initialize schema
+---
+
+## Step 5 — Initialize the database schema
 
 ```bash
 python3 -c "
-from claude_swarm import db
-db.connect().close()
+import sys; sys.path.insert(0, '$SCRIPTS_PARENT')
+from scripts import db
 db.init_schema()
-print('OK: connected and tasks table ready')
+print('OK: schema ready')
 "
 ```
 
-If this fails:
-- Check that the Postgres server is running and reachable
-- Make sure `SWARM_PG_DSN` is set in the current shell (restart Claude Code after saving settings)
-- Verify the database and user exist with CONNECT privilege
+---
 
-## 5. Confirm to the user
+## Step 6 — Save DSN to project settings
 
-Setup is complete. They can now use:
-- `swarm-spawn "<prompt>"` — run any task in a child Claude instance
-- `swarm-expert researcher "<topic>"` — spawn a researcher agent
-- `swarm-expert analyst "<subject>"` — spawn an analyst agent
-- `swarm-expert coder "<task>"` — spawn a coding agent
-- `swarm-wait <task_id> [...]` — block until tasks complete, print results
-- `swarm-logs <task_id>` — stream live output from a running task
-- `swarm-cancel <task_id>` — cancel a running task
-- `swarm-clean` — close tmux windows for completed/failed tasks
-- `/claude-swarm` — access all swarm commands via the skill
+Persists `SWARM_PG_DSN` so Claude Code sessions load it automatically on startup:
+
+```bash
+python3 - << 'EOF'
+import json, pathlib, os
+p = pathlib.Path(".claude/settings.json")
+s = json.loads(p.read_text()) if p.exists() else {}
+s.setdefault("env", {})["SWARM_PG_DSN"] = os.environ["SWARM_PG_DSN"]
+p.parent.mkdir(exist_ok=True)
+p.write_text(json.dumps(s, indent=2))
+print("Saved to .claude/settings.json")
+EOF
+```
+
+---
+
+## Step 7 — Verify with doctor
+
+```bash
+swarm-doctor
+```
+
+All 8 checks should pass. Common fixes:
+
+| Failing check | Fix |
+|---|---|
+| `SWARM_PG_DSN not set` | Re-run Step 4, then open a new shell |
+| `PostgreSQL unreachable` | Check host/port/firewall; verify DB server is running |
+| `tasks table missing` | Re-run Step 5 |
+| `tmux not found` | `apt install tmux` or `brew install tmux` |
+| `claude CLI not found` | Install Claude Code: https://claude.ai/code |
+| `API key missing` | Set `ANTHROPIC_API_KEY` in your shell |
+| `rich not installed` | `pip install rich` |
+
+---
+
+## Done — Available commands
+
+| Command | What it does |
+|---------|-------------|
+| `swarm-spawn "<prompt>"` | Run any task in a child Claude instance |
+| `swarm-expert researcher "<topic>"` | Researcher agent (WebSearch + WebFetch) |
+| `swarm-expert analyst "<subject>"` | Analyst agent (WebSearch + WebFetch) |
+| `swarm-expert coder "<task>"` | Coder agent (Read + Write + Bash) |
+| `swarm-wait <id> [<id2> ...]` | Wait for tasks — live table + color-coded results |
+| `swarm-status` | Snapshot of recent tasks |
+| `swarm-status --live` | Auto-refreshing live dashboard |
+| `swarm-logs <id>` | Stream live output from a running task |
+| `swarm-cancel <id>` | Cancel a running task |
+| `swarm-clean` | Close tmux windows for finished tasks |
+| `swarm-clean --logs` | Also purge preserved log files |
+| `swarm-doctor` | Pre-flight check for all dependencies |

@@ -7,7 +7,9 @@ import os
 import sys
 import subprocess
 
-from claude_swarm import db
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".agents", "skills", "claude-swarm"))
+
+from scripts import db
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
@@ -33,13 +35,13 @@ def run_claude(prompt: str, timeout: int = 180) -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_smoke():
-    """Ask Claude to spawn a single task and verify it completes via the swarm."""
-    print("\n[1] Smoke — spawn and wait via swarm skill")
+    """Ask Claude to spawn a single task via swarm-spawn and verify it completes."""
+    print("\n[1] Smoke — spawn and wait via bash wrappers")
 
     before = len(db.list_tasks(100))
     output = run_claude(
-        "Use the swarm to spawn a task that replies with exactly: SMOKE_OK. "
-        "Wait for the result and report the output."
+        "Use swarm-spawn to spawn a task that replies with exactly: SMOKE_OK. "
+        "Then use swarm-wait to wait for the result and report the output."
     )
     after = len(db.list_tasks(100))
 
@@ -49,13 +51,37 @@ def test_smoke():
     return ok
 
 
+def test_bash_wrapper_spawn():
+    """Directly invoke swarm-spawn and swarm-wait as bash commands and verify output."""
+    print("\n[2] Bash wrapper — swarm-spawn + swarm-wait direct invocation")
+
+    result = subprocess.run(
+        ["swarm-spawn", "Reply with exactly: WRAPPER_OK"],
+        capture_output=True, text=True, timeout=30,
+    )
+    ok = True
+    ok &= check("swarm-spawn exits 0", result.returncode == 0, result.stderr[:200])
+    task_id = result.stdout.strip().splitlines()[-1]  # last line is UUID
+    ok &= check("swarm-spawn prints UUID", len(task_id) == 36, repr(task_id))
+
+    if not ok:
+        return False
+
+    result = subprocess.run(
+        ["swarm-wait", task_id],
+        capture_output=True, text=True, timeout=120,
+    )
+    ok &= check("swarm-wait exits 0", result.returncode == 0, result.stderr[:200])
+    ok &= check("output contains WRAPPER_OK", "WRAPPER_OK" in result.stdout, repr(result.stdout[:200]))
+    return ok
+
+
 def test_faang_research():
     """
-    Ask Claude to research FAANG stock price projections using parallel researcher
-    agents. Verifies that tasks are dispatched through the swarm and that the
-    synthesised output covers the expected companies.
+    Ask Claude to research FAANG stock projections using parallel researcher agents.
+    Verifies tasks are dispatched through the swarm and output covers expected companies.
     """
-    print("\n[2] FAANG research — parallel researcher swarm")
+    print("\n[3] FAANG research — parallel researcher swarm")
 
     before = len(db.list_tasks(200))
 
@@ -63,7 +89,8 @@ def test_faang_research():
         "Use the claude-swarm researcher skill to fetch 2025 stock price projections "
         "for each FAANG company (Apple / AAPL, Google / Alphabet / GOOGL, "
         "Meta / META, Amazon / AMZN, Netflix / NFLX). "
-        "Spawn one researcher agent per company in parallel, wait for all results, "
+        "Spawn one researcher agent per company in parallel using swarm-expert researcher, "
+        "wait for all results with swarm-wait, "
         "then give me a concise summary with each company's analyst outlook.",
         timeout=360,
     )
@@ -74,7 +101,6 @@ def test_faang_research():
     ok = True
     ok &= check("swarm tasks were spawned", spawned >= 1, f"spawned={spawned}")
 
-    # At least researcher tasks should have run
     recent = after_tasks[:spawned] if spawned > 0 else []
     done   = [t for t in recent if t["status"] == "done"]
     failed = [t for t in recent if t["status"] == "failed"]
@@ -82,12 +108,10 @@ def test_faang_research():
     ok &= check("no tasks failed", len(failed) == 0,
                 f"failed={[str(t['id'])[:8] for t in failed]}")
 
-    # Output should mention at least 3 of the 5 companies
     tickers = ["apple", "aapl", "google", "alphabet", "googl",
                "meta", "amazon", "amzn", "netflix", "nflx"]
     hits = [t for t in tickers if t in output.lower()]
-    ok &= check("FAANG companies in output", len(hits) >= 3,
-                f"matched={hits}")
+    ok &= check("FAANG companies in output", len(hits) >= 3, f"matched={hits}")
 
     return ok
 
@@ -101,7 +125,7 @@ if __name__ == "__main__":
 
     db.init_schema()
 
-    tests = [test_smoke, test_faang_research]
+    tests = [test_smoke, test_bash_wrapper_spawn, test_faang_research]
     passed = 0
     for t in tests:
         try:

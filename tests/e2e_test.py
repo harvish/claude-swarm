@@ -8,14 +8,18 @@ import os
 import time
 import subprocess
 import threading
+import shutil
 
-from claude_swarm import db
-from claude_swarm.wait import wait_for
-from claude_swarm.spawn import spawn
-from claude_swarm.config import TMUX_SESSION
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".agents", "skills", "claude-swarm"))
+
+from scripts import db
+from scripts.wait import wait_for
+from scripts.spawn import spawn
+from scripts.config import TMUX_SESSION
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
+
 
 def check(name, condition, detail=""):
     if condition:
@@ -23,6 +27,7 @@ def check(name, condition, detail=""):
     else:
         print(f"  {FAIL}  {name}" + (f": {detail}" if detail else ""))
     return condition
+
 
 def test_db_connection():
     print("\n[1] DB connection")
@@ -35,18 +40,19 @@ def test_db_connection():
         check("connect to postgres", False, str(e))
         return False
 
+
 def test_schema_init():
     print("\n[2] Schema init")
     try:
         db.init_schema()
         check("init_schema runs without error", True)
-        # idempotent
         db.init_schema()
         check("init_schema is idempotent", True)
         return True
     except Exception as e:
         check("init_schema", False, str(e))
         return False
+
 
 def test_task_lifecycle():
     print("\n[3] Task lifecycle (no claude)")
@@ -67,6 +73,7 @@ def test_task_lifecycle():
     check("completed_at set", task["completed_at"] is not None)
     return True
 
+
 def test_parent_child():
     print("\n[4] Parent-child relationship")
     parent_id = db.create_task("parent task")
@@ -74,6 +81,7 @@ def test_parent_child():
     child = db.get_task(child_id)
     check("child has correct parent_id", str(child["parent_id"]) == parent_id)
     return True
+
 
 def test_notify_listen():
     print("\n[5] LISTEN/NOTIFY")
@@ -99,12 +107,12 @@ def test_notify_listen():
         check("output matches", received[0]["output"] == "notify output")
     return len(received) == 1
 
+
 def test_tmux_session():
     print("\n[6] Tmux session")
     result = subprocess.run(["tmux", "has-session", "-t", TMUX_SESSION], capture_output=True)
     existed = result.returncode == 0
 
-    # ensure_session is called by spawn, test it via subprocess
     subprocess.run(["tmux", "new-session", "-d", "-s", TMUX_SESSION], capture_output=True)
     result = subprocess.run(["tmux", "has-session", "-t", TMUX_SESSION], capture_output=True)
     check("tmux session can be created", result.returncode == 0)
@@ -113,22 +121,47 @@ def test_tmux_session():
         subprocess.run(["tmux", "kill-session", "-t", TMUX_SESSION], capture_output=True)
     return True
 
+
+def test_bash_wrappers():
+    print("\n[7] Bash wrappers in PATH")
+    ok = True
+    for cmd in ["swarm-spawn", "swarm-wait", "swarm-status", "swarm-doctor",
+                "swarm-logs", "swarm-cancel", "swarm-clean", "swarm-expert"]:
+        found = shutil.which(cmd) is not None
+        ok &= check(f"{cmd} in PATH", found)
+
+    # swarm-status should exit 0 and print something
+    result = subprocess.run(["swarm-status", "-n", "1"], capture_output=True, text=True)
+    ok &= check("swarm-status exits 0", result.returncode == 0, result.stderr[:200])
+
+    return ok
+
+
 def test_worker_direct():
-    print("\n[7] Worker with real claude (echo task)")
+    print("\n[8] Worker with real claude (echo task)")
+    scripts_parent = os.path.join(
+        os.path.dirname(__file__), "..", ".agents", "skills", "claude-swarm"
+    )
     task_id = db.create_task("Reply with exactly: SWARM_OK")
 
     result = subprocess.run(
-        [sys.executable, "-m", "claude_swarm.worker", task_id],
-        capture_output=True, text=True, timeout=60
+        [
+            sys.executable, "-c",
+            f"import sys; sys.path.insert(0, {repr(scripts_parent)}); "
+            f"from scripts.worker import run; run({repr(task_id)})"
+        ],
+        capture_output=True, text=True, timeout=60,
+        env={**os.environ, "SWARM_PG_DSN": os.environ.get("SWARM_PG_DSN", "")},
     )
     task = db.get_task(task_id)
-    check("worker exited cleanly", result.returncode == 0, result.stderr)
+    check("worker exited cleanly", result.returncode == 0, result.stderr[:200])
     check("status=done", task["status"] == "done", task.get("error"))
     check("output contains SWARM_OK", "SWARM_OK" in (task["output"] or ""), repr(task["output"]))
     return task["status"] == "done"
 
+
 def test_spawn_and_wait():
-    print("\n[8] Spawn via tmux + wait")
+    print("\n[9] Spawn via tmux + wait")
     task_id = spawn("Reply with exactly: SPAWN_OK")
     check("spawn returned a task_id", len(task_id) == 36)
 
@@ -140,8 +173,9 @@ def test_spawn_and_wait():
         check("output contains SPAWN_OK", "SPAWN_OK" in (task["output"] or ""), repr(task["output"]))
     return task_id in results
 
+
 def test_parallel_spawn():
-    print("\n[9] Parallel spawn (3 children)")
+    print("\n[10] Parallel spawn (3 children)")
     prompts = [
         "Reply with exactly: PARALLEL_A",
         "Reply with exactly: PARALLEL_B",
@@ -159,17 +193,21 @@ def test_parallel_spawn():
             check(f"task {i+1} output correct", expected in (task["output"] or ""), repr(task["output"]))
     return len(results) == 3
 
+
 def test_list_tasks():
-    print("\n[10] list_tasks")
+    print("\n[11] list_tasks")
     tasks = db.list_tasks(50)
     check("returns a list", isinstance(tasks, list))
     check("has tasks", len(tasks) > 0)
     return True
 
+
 if __name__ == "__main__":
-    print("=" * 50)
+    print("=" * 55)
     print("Claude Swarm — End-to-End Tests")
-    print("=" * 50)
+    print("=" * 55)
+
+    db.init_schema()
 
     tests = [
         test_db_connection,
@@ -178,6 +216,7 @@ if __name__ == "__main__":
         test_parent_child,
         test_notify_listen,
         test_tmux_session,
+        test_bash_wrappers,
         test_worker_direct,
         test_spawn_and_wait,
         test_parallel_spawn,
@@ -193,7 +232,7 @@ if __name__ == "__main__":
             print(f"  {FAIL}  unhandled exception: {e}")
 
     total = len(tests)
-    print(f"\n{'=' * 50}")
+    print(f"\n{'=' * 55}")
     print(f"Results: {passed}/{total} tests passed")
-    print("=" * 50)
+    print("=" * 55)
     sys.exit(0 if passed == total else 1)

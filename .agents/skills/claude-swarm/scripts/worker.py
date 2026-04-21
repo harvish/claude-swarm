@@ -47,8 +47,7 @@ def run(task_id: str, allowed_tools: list[str] = None):
     except Exception as e:
         db.set_failed(task_id, str(e))
     finally:
-        if lf_path.exists():
-            lf_path.unlink()
+        pass  # log file preserved for post-mortem; use swarm-clean --logs to purge
 
 if __name__ == "__main__":
     import argparse
