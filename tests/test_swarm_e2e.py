@@ -15,7 +15,11 @@ PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
 SKIP = "\033[33mSKIP\033[0m"
 
-API_KEY_SET = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
+API_KEY_SET = bool(
+    os.environ.get("ANTHROPIC_AUTH_TOKEN") or
+    os.environ.get("ANTHROPIC_API_KEY") or
+    os.environ.get("OPENROUTER_API_KEY")
+)
 
 
 def check(name, condition, detail=""):
