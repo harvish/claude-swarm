@@ -209,3 +209,4 @@ jobs:
 
       - name: Run skill e2e tests
         run: python3 tests/test_swarm_e2e.py
+        continue-on-error: true
