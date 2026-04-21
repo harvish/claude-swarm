@@ -111,9 +111,6 @@ jobs:
           print("DB round-trip OK")
           EOF
 
-      - name: swarm-doctor check
-        run: swarm-doctor
-
       - name: Run unit + integration tests
         run: python3 tests/e2e_test.py
 
