@@ -141,6 +141,7 @@ jobs:
 
     env:
       SWARM_PG_DSN: "host=localhost port=5432 dbname=swarm user=swarm password=swarmtest"
+      ANTHROPIC_API_KEY: ""
       ANTHROPIC_AUTH_TOKEN: ${{ secrets.OPENROUTER_API_KEY }}
       ANTHROPIC_BASE_URL: https://openrouter.ai/api
       ANTHROPIC_DEFAULT_SONNET_MODEL: anthropic/claude-haiku-4.5

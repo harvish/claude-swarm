@@ -36,19 +36,16 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None,
         "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
         "ANTHROPIC_DEFAULT_OPUS_MODEL",
     ]
-    unset_parts = []
     env_parts = [f"SWARM_PG_DSN={repr(PG_DSN)}", f"SWARM_TMUX_SESSION={repr(_TS)}"]
     for var in _AUTH_VARS:
         val = os.environ.get(var)
         if val:
             env_parts.append(f"{var}={repr(val)}")
-        elif os.environ.get(var) is not None:
-            # var is set but empty in parent — unset in child so it doesn't shadow ANTHROPIC_AUTH_TOKEN
-            unset_parts.append(var)
-    unset_prefix = ("unset " + " ".join(unset_parts) + "; ") if unset_parts else ""
+        # empty vars are intentionally left to inherit from the parent env;
+        # ANTHROPIC_API_KEY="" is required by claude CLI for OpenRouter routing
     env_prefix = " ".join(env_parts)
     cmd = (
-        f"{unset_prefix}{env_prefix} python3 -c \""
+        f"{env_prefix} python3 -c \""
         f"import sys; sys.path.insert(0, '{scripts_parent}'); "
         f"from scripts.worker import run; "
         f"run('{task_id}'{tools_arg})\""
