@@ -16,9 +16,6 @@ def run(task_id: str, allowed_tools: list[str] = None):
     cmd = ["claude", "-p", task["prompt"]]
     if allowed_tools:
         cmd += ["--allowedTools", ",".join(allowed_tools)]
-    model = os.environ.get("CLAUDE_MODEL")
-    if model:
-        cmd += ["--model", model]
 
     lf_path = log_path(task_id)
     lines = []
