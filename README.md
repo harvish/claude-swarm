@@ -12,7 +12,7 @@ Orchestrate parallel Claude Code agents for research, coding, and analysis. Spaw
 npx skills add harvish/claude-swarm
 ```
 
-[Details](.agents/skills/claude-swarm/README.md)
+[Details](.claude/skills/claude-swarm/README.md)
 
 ---
 

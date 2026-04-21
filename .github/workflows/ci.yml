@@ -43,7 +43,7 @@ jobs:
       - name: Create bash wrappers (tests onboarding flow)
         run: |
           SWARM_ROOT="$(pwd)"
-          SCRIPTS_PARENT="$SWARM_ROOT/.agents/skills/claude-swarm"
+          SCRIPTS_PARENT="$SWARM_ROOT/.claude/skills/claude-swarm"
           DSN="$SWARM_PG_DSN"
           mkdir -p ~/.local/bin
           for cmd in spawn wait expert logs cancel clean status doctor; do
@@ -53,7 +53,7 @@ jobs:
           exec python3 -c "
           import sys
           sys.path.insert(0, '$SCRIPTS_PARENT')
-          from scripts.\${cmd} import main
+          from scripts.${cmd} import main
           main()
           " "\$@"
           WRAPPER
@@ -64,10 +64,10 @@ jobs:
 
       - name: Validate skill structure
         run: |
-          test -f .agents/skills/claude-swarm/SKILL.md \
+          test -f .claude/skills/claude-swarm/SKILL.md \
             || { echo "ERROR: SKILL.md missing"; exit 1; }
           python3 - <<'EOF'
-          content = open(".agents/skills/claude-swarm/SKILL.md").read()
+          content = open(".claude/skills/claude-swarm/SKILL.md").read()
           assert content.startswith("---"), "SKILL.md missing YAML frontmatter"
           import re
           front = content.split("---")[1]
@@ -79,7 +79,7 @@ jobs:
       - name: Initialize schema
         run: |
           python3 -c "
-          import sys; sys.path.insert(0, '.agents/skills/claude-swarm')
+          import sys; sys.path.insert(0, '.claude/skills/claude-swarm')
           from scripts import db
           db.init_schema()
           print('Schema ready')
@@ -88,7 +88,7 @@ jobs:
       - name: DB round-trip test
         run: |
           python3 - <<'EOF'
-          import sys; sys.path.insert(0, ".agents/skills/claude-swarm")
+          import sys; sys.path.insert(0, ".claude/skills/claude-swarm")
           from scripts import db
 
           # Basic lifecycle
@@ -165,7 +165,7 @@ jobs:
       - name: Create bash wrappers
         run: |
           SWARM_ROOT="$(pwd)"
-          SCRIPTS_PARENT="$SWARM_ROOT/.agents/skills/claude-swarm"
+          SCRIPTS_PARENT="$SWARM_ROOT/.claude/skills/claude-swarm"
           DSN="$SWARM_PG_DSN"
           mkdir -p ~/.local/bin
           for cmd in spawn wait expert logs cancel clean status doctor; do
@@ -175,7 +175,7 @@ jobs:
           exec python3 -c "
           import sys
           sys.path.insert(0, '$SCRIPTS_PARENT')
-          from scripts.\${cmd} import main
+          from scripts.${cmd} import main
           main()
           " "\$@"
           WRAPPER
@@ -189,7 +189,7 @@ jobs:
       - name: Initialize schema
         run: |
           python3 -c "
-          import sys; sys.path.insert(0, '.agents/skills/claude-swarm')
+          import sys; sys.path.insert(0, '.claude/skills/claude-swarm')
           from scripts import db
           db.init_schema()
           print('Schema ready')
@@ -198,7 +198,7 @@ jobs:
       - name: Verify skill visible to Claude Code
         run: |
           claude --version
-          test -f .agents/skills/claude-swarm/SKILL.md
+          test -f .claude/skills/claude-swarm/SKILL.md
           echo "claude-swarm skill present"
 
       - name: swarm-doctor check

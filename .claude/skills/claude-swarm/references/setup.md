@@ -37,7 +37,7 @@ Run from the project root (where `.agents/` lives):
 
 ```bash
 SWARM_ROOT="$(pwd)"
-SCRIPTS_PARENT="$SWARM_ROOT/.agents/skills/claude-swarm"
+SCRIPTS_PARENT="$SWARM_ROOT/.claude/skills/claude-swarm"
 
 mkdir -p ~/.local/bin
 
@@ -48,7 +48,7 @@ export SWARM_PG_DSN="\${SWARM_PG_DSN:-$DSN}"
 exec python3 -c "
 import sys
 sys.path.insert(0, '$SCRIPTS_PARENT')
-from scripts.\${cmd} import main
+from scripts.${cmd} import main
 main()
 " "\$@"
 WRAPPER

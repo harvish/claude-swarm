@@ -10,7 +10,7 @@ import subprocess
 import threading
 import shutil
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".agents", "skills", "claude-swarm"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".claude", "skills", "claude-swarm"))
 
 from scripts import db
 from scripts.wait import wait_for
@@ -19,6 +19,9 @@ from scripts.config import TMUX_SESSION
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
+SKIP = "\033[33mSKIP\033[0m"
+
+CLAUDE_AVAILABLE = shutil.which("claude") is not None
 
 
 def check(name, condition, detail=""):
@@ -139,8 +142,12 @@ def test_bash_wrappers():
 
 def test_worker_direct():
     print("\n[8] Worker with real claude (echo task)")
+    if not CLAUDE_AVAILABLE:
+        print(f"  {SKIP}  claude CLI not in PATH — skipping")
+        return True
+
     scripts_parent = os.path.join(
-        os.path.dirname(__file__), "..", ".agents", "skills", "claude-swarm"
+        os.path.dirname(__file__), "..", ".claude", "skills", "claude-swarm"
     )
     task_id = db.create_task("Reply with exactly: SWARM_OK")
 
@@ -162,6 +169,10 @@ def test_worker_direct():
 
 def test_spawn_and_wait():
     print("\n[9] Spawn via tmux + wait")
+    if not CLAUDE_AVAILABLE:
+        print(f"  {SKIP}  claude CLI not in PATH — skipping")
+        return True
+
     task_id = spawn("Reply with exactly: SPAWN_OK")
     check("spawn returned a task_id", len(task_id) == 36)
 
@@ -176,6 +187,10 @@ def test_spawn_and_wait():
 
 def test_parallel_spawn():
     print("\n[10] Parallel spawn (3 children)")
+    if not CLAUDE_AVAILABLE:
+        print(f"  {SKIP}  claude CLI not in PATH — skipping")
+        return True
+
     prompts = [
         "Reply with exactly: PARALLEL_A",
         "Reply with exactly: PARALLEL_B",

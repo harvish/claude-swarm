@@ -7,7 +7,7 @@ import os
 import sys
 import subprocess
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".agents", "skills", "claude-swarm"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".claude", "skills", "claude-swarm"))
 
 from scripts import db
 

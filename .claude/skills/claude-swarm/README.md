@@ -31,7 +31,7 @@ Trigger phrases that cause Claude to auto-activate swarm mode:
 ## Skill structure
 
 ```
-.agents/skills/claude-swarm/
+.claude/skills/claude-swarm/
 ├── SKILL.md              # skill definition (loaded by Claude Code)
 ├── scripts/              # CLI helpers: swarm-spawn, swarm-wait, swarm-expert
 └── references/setup.md   # first-run onboarding guide
