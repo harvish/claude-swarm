@@ -73,9 +73,13 @@ def run():
     _check("claude CLI in PATH", ok, "" if ok else "install Claude Code: https://claude.ai/code")
     passed += ok; failed += not ok
 
-    # 7. ANTHROPIC_API_KEY or equivalent
-    has_key = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
-    _check("API key set (ANTHROPIC_API_KEY or OPENROUTER_API_KEY)", has_key,
+    # 7. ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / OPENROUTER_API_KEY
+    has_key = bool(
+        os.environ.get("ANTHROPIC_API_KEY") or
+        os.environ.get("ANTHROPIC_AUTH_TOKEN") or
+        os.environ.get("OPENROUTER_API_KEY")
+    )
+    _check("API key set (ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / OPENROUTER_API_KEY)", has_key,
            "" if has_key else "child agents won't authenticate")
     passed += has_key; failed += not has_key
 
