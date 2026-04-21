@@ -39,7 +39,7 @@ def spawn(prompt: str, parent_id: str = None, workdir: str = None,
     env_parts = [f"SWARM_PG_DSN={repr(PG_DSN)}", f"SWARM_TMUX_SESSION={repr(_TS)}"]
     for var in _AUTH_VARS:
         val = os.environ.get(var)
-        if val is not None:
+        if val:  # skip empty — empty ANTHROPIC_API_KEY confuses auth resolution
             env_parts.append(f"{var}={repr(val)}")
     env_prefix = " ".join(env_parts)
     cmd = (
