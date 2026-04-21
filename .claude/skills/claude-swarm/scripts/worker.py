@@ -16,6 +16,9 @@ def run(task_id: str, allowed_tools: list[str] = None):
     cmd = ["claude", "-p", task["prompt"]]
     if allowed_tools:
         cmd += ["--allowedTools", ",".join(allowed_tools)]
+    max_tokens = os.environ.get("CLAUDE_MAX_TOKENS")
+    if max_tokens:
+        cmd += ["--max-tokens", max_tokens]
 
     lf_path = log_path(task_id)
     lines = []
