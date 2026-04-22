@@ -3,41 +3,16 @@
 import sys
 import time
 import argparse
+import datetime
 
 from . import db
 from .errors import handle_connection_error
+from .utils import task_label, style, TASK_TIMEOUT_S
 
-import datetime
-
-_STATUS_STYLE = {
-    "pending": ("yellow", "⏳"),
-    "running": ("cyan",   "⚙ "),
-    "done":    ("green",  "✓ "),
-    "failed":  ("red",    "✗ "),
-    "zombie":  ("red",    "💀"),
-}
-
-_ZOMBIE_THRESHOLD_S = 600  # 10 min with no completion = likely hung
-
-
-def _task_label(prompt: str, max_len: int = 65) -> str:
-    """Short display label. Expert prompts contain 'Task: <topic>'; extract just the topic
-    (first occurrence — synthesizer puts it near the top, researcher at the end)."""
-    lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
-    if not lines:
-        return ""
-    for line in lines:
-        if line.startswith("Task: "):
-            return line[6:][:max_len]
-    candidate = lines[-1] if len(lines[-1]) <= max_len else lines[0]
-    return candidate[:max_len]
-
-def _style(status):
-    return _STATUS_STYLE.get(status, ("white", "? "))
+_ZOMBIE_THRESHOLD_S = TASK_TIMEOUT_S
 
 
 def _effective_status(t):
-    """Return 'zombie' for running tasks stuck beyond threshold."""
     if t.get("status") != "running":
         return t.get("status", "pending")
     if t.get("started_at"):
@@ -51,7 +26,6 @@ def _make_table(tasks, title="Recent Tasks", live=False):
     from rich.table import Table
     from rich.text import Text
     from rich import box as rbox
-    import datetime
 
     effective = [_effective_status(t) for t in tasks]
     done   = effective.count("done")
@@ -82,17 +56,17 @@ def _make_table(tasks, title="Recent Tasks", live=False):
         status = _effective_status(t)
         if status == "zombie":
             zombies += 1
-        color, icon = _style(status)
+        color, icon = style(status)
         elapsed = ""
         if t.get("started_at"):
-            end = t.get("completed_at") or datetime.datetime.now(datetime.timezone.utc)
+            end  = t.get("completed_at") or datetime.datetime.now(datetime.timezone.utc)
             secs = int((end - t["started_at"]).total_seconds())
             elapsed = f"{secs}s"
         if live and status == "running":
             spinner_frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
             icon = spinner_frames[int(time.time() * 8) % len(spinner_frames)]
         parent = str(t["parent_id"])[:8] if t.get("parent_id") else "-"
-        prompt = _task_label(t.get("prompt") or "")
+        prompt = task_label(t.get("prompt") or "")
         table.add_row(
             Text(icon,              style=color),
             Text(str(t["id"])[:8],  style="dim"),
@@ -107,20 +81,18 @@ def _make_table(tasks, title="Recent Tasks", live=False):
 
 
 def _plain_snapshot(tasks):
-    """TTY-safe plain-text output for CI/pipes."""
     header = f"{'':2} {'ID':8}  {'STATUS':9}  {'ELAPSED':>7}  PROMPT"
     print(header)
     print("-" * 70)
-    import datetime
     for t in tasks:
         status = t.get("status", "pending")
-        _, icon = _style(status)
+        _, icon = style(status)
         elapsed = ""
         if t.get("started_at"):
-            end = t.get("completed_at") or datetime.datetime.now(datetime.timezone.utc)
+            end  = t.get("completed_at") or datetime.datetime.now(datetime.timezone.utc)
             secs = int((end - t["started_at"]).total_seconds())
             elapsed = f"{secs}s"
-        prompt = _task_label(t.get("prompt") or "", max_len=55)
+        prompt = task_label(t.get("prompt") or "", max_len=55)
         print(f"{icon} {str(t['id'])[:8]}  {status:<9}  {elapsed:>7}  {prompt}")
 
 
@@ -128,11 +100,12 @@ def snapshot(limit=20, json_out=False):
     tasks = db.list_tasks(limit)
     if json_out:
         import json
-        import datetime
+
         def _serial(o):
             if isinstance(o, datetime.datetime):
                 return o.isoformat()
             return str(o)
+
         print(json.dumps(tasks, default=_serial, indent=2))
         return
 
@@ -149,9 +122,8 @@ def snapshot(limit=20, json_out=False):
 
 def live_dashboard(limit=20, refresh=2):
     try:
-        from rich.live import Live
+        from rich.live    import Live
         from rich.console import Console
-        from rich.text import Text
     except ImportError:
         print("[swarm] rich not installed — showing snapshot instead", file=sys.stderr)
         snapshot(limit)

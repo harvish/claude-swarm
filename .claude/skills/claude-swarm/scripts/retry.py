@@ -41,10 +41,11 @@ def retry(task_id: str) -> str:
 
 @handle_connection_error
 def main():
-    if len(sys.argv) < 2:
-        print("usage: swarm-retry <task_id>", file=sys.stderr)
-        sys.exit(1)
-    retry(sys.argv[1])
+    import argparse
+    parser = argparse.ArgumentParser(description="Re-spawn a failed or timed-out swarm task")
+    parser.add_argument("task_id")
+    args = parser.parse_args()
+    retry(args.task_id)
 
 
 if __name__ == "__main__":

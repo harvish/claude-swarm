@@ -84,10 +84,11 @@ def tail_task(task_id: str):
 
 @handle_connection_error
 def main():
-    if len(sys.argv) < 2:
-        print("usage: swarm-logs <task_id>", file=sys.stderr)
-        sys.exit(1)
-    tail_task(sys.argv[1])
+    import argparse
+    parser = argparse.ArgumentParser(description="Stream live output from a swarm task")
+    parser.add_argument("task_id")
+    args = parser.parse_args()
+    tail_task(args.task_id)
 
 
 if __name__ == "__main__":

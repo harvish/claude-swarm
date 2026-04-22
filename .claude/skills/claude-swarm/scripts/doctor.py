@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Pre-flight check: validates swarm dependencies and configuration."""
+import os
 import sys
 import subprocess
 import shutil
+from pathlib import Path
 
 
 def _check(label, ok, detail=""):
-    mark = "✓" if ok else "✗"
+    mark  = "✓" if ok else "✗"
     color = "\033[32m" if ok else "\033[31m"
     reset = "\033[0m"
     suffix = f"  {detail}" if detail else ""
@@ -20,42 +22,39 @@ def run():
     failed = 0
 
     # 1. SWARM_PG_DSN
-    import os
     dsn = os.environ.get("SWARM_PG_DSN", "")
-    ok = bool(dsn)
+    ok  = bool(dsn)
     _check("SWARM_PG_DSN set", ok, dsn[:40] + "…" if len(dsn) > 40 else dsn)
     passed += ok; failed += not ok
 
-    # 2. PostgreSQL connectivity
+    # 2 + 3. PostgreSQL connectivity and schema (single connection)
+    pg_ok = False
     try:
         import psycopg2
         from .config import PG_DSN
         conn = psycopg2.connect(PG_DSN)
-        ver = conn.server_version
+        ver  = conn.server_version
+        _check("PostgreSQL reachable", True, f"server version {ver}")
+        passed += 1
+        pg_ok = True
+
+        cur   = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM tasks")
+        count = cur.fetchone()[0]
+        cur.close()
         conn.close()
-        ok = True
-        detail = f"server version {ver}"
+        _check("tasks table exists", True, f"{count} rows")
+        passed += 1
     except Exception as e:
-        ok = False
-        detail = str(e)[:80]
-    _check("PostgreSQL reachable", ok, detail)
-    passed += ok; failed += not ok
+        msg = str(e)[:80]
+        if not pg_ok:
+            _check("PostgreSQL reachable", False, msg)
+            _check("tasks table exists",   False, "skipped (no connection)")
+        else:
+            _check("tasks table exists", False, msg)
+        failed += 2 - pg_ok
 
-    # 3. tasks table exists
-    if ok:
-        try:
-            conn = psycopg2.connect(PG_DSN)
-            cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM tasks")
-            count = cur.fetchone()[0]
-            conn.close()
-            _check("tasks table exists", True, f"{count} rows")
-            passed += 1
-        except Exception as e:
-            _check("tasks table exists", False, str(e)[:80])
-            failed += 1
-
-    # 4. tmux available
+    # 4. tmux
     ok = shutil.which("tmux") is not None
     _check("tmux in PATH", ok)
     passed += ok; failed += not ok
@@ -73,25 +72,17 @@ def run():
     _check("claude CLI in PATH", ok, "" if ok else "install Claude Code: https://claude.ai/code")
     passed += ok; failed += not ok
 
-    # 7. Auth credential — env var OR Claude Code local session (~/.claude/.credentials.json)
-    from pathlib import Path
+    # 7. Auth credential
     _creds_file = Path.home() / ".claude" / ".credentials.json"
-    has_key = bool(
-        os.environ.get("ANTHROPIC_API_KEY") or
-        os.environ.get("ANTHROPIC_AUTH_TOKEN") or
-        os.environ.get("OPENROUTER_API_KEY") or
-        _creds_file.exists()
-    )
-    if has_key and _creds_file.exists() and not any(os.environ.get(v) for v in
-            ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENROUTER_API_KEY")):
-        detail = f"via {_creds_file}"
-    else:
-        detail = ""
+    env_keys    = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENROUTER_API_KEY")
+    has_env_key = any(os.environ.get(v) for v in env_keys)
+    has_key     = has_env_key or _creds_file.exists()
+    detail      = f"via {_creds_file}" if (has_key and not has_env_key) else ""
     _check("Auth credential set", has_key,
            detail if has_key else "set ANTHROPIC_API_KEY or log in with 'claude' CLI")
     passed += has_key; failed += not has_key
 
-    # 8. rich installed
+    # 8. rich
     try:
         import rich
         ver = getattr(rich, "__version__", None) or getattr(rich, "version", {}).get("VERSION", "?")

@@ -32,9 +32,9 @@ No package install needed — swarm commands run directly from the skill scripts
 
 ## Step 3 — Symlink bin/ wrappers into PATH
 
-The `bin/` directory in the skill is version-controlled and contains
-self-locating wrappers (they resolve their own path via `readlink -f`,
-so symlinks work correctly from any location).
+The `bin/` directory contains a single `swarm` dispatcher script and
+symlinks for each `swarm-<cmd>` name. All routing is by `basename $0`.
+`readlink -f` is used to resolve through the `~/.local/bin` symlink layer.
 
 Run from the project root (where `.agents/` lives):
 
@@ -50,6 +50,9 @@ done
 
 echo "Linked: $(ls ~/.local/bin/swarm-* | xargs -n1 basename | tr '\n' ' ')"
 ```
+
+To add a new command later: create `scripts/<name>.py` with a `main()`,
+then add `ln -s swarm bin/swarm-<name>` — no other files to touch.
 
 ---
 

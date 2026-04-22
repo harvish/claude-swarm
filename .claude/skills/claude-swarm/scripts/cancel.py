@@ -25,10 +25,11 @@ def cancel(task_id: str):
 
 @handle_connection_error
 def main():
-    if len(sys.argv) < 2:
-        print("usage: swarm-cancel <task_id>", file=sys.stderr)
-        sys.exit(1)
-    cancel(sys.argv[1])
+    import argparse
+    parser = argparse.ArgumentParser(description="Cancel a running swarm task")
+    parser.add_argument("task_id")
+    args = parser.parse_args()
+    cancel(args.task_id)
 
 
 if __name__ == "__main__":

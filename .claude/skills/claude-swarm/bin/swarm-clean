@@ -1,9 +1,1 @@
-#!/usr/bin/env bash
-REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
-SKILL_DIR="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
-exec python3 -c "
-import sys
-sys.path.insert(0, '$SKILL_DIR')
-from scripts.clean import main
-main()
-" "$@"
+swarm

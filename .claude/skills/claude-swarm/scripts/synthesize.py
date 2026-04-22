@@ -3,23 +3,12 @@
 import sys
 
 from . import db
-from .expert import spawn_expert, EXPERT_TOOLS
+from .expert import spawn_expert
 from .errors import handle_connection_error
-
-
-def _task_label(prompt: str, max_len: int = 50) -> str:
-    lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
-    if not lines:
-        return ""
-    last = lines[-1]
-    if last.startswith("Task: "):
-        return last[6:][:max_len]
-    candidate = last if len(last) <= max_len else lines[0]
-    return candidate[:max_len]
+from .utils import task_label
 
 
 def synthesize(task_ids: list[str], question: str = "", parent_id: str = None) -> str:
-    """Fetch outputs from task_ids and spawn a synthesizer over them."""
     sections = []
     labels   = []
     errors   = []
@@ -27,7 +16,7 @@ def synthesize(task_ids: list[str], question: str = "", parent_id: str = None) -
     for tid in task_ids:
         task   = db.get_task(tid)
         status = task.get("status", "unknown")
-        label  = _task_label(task.get("prompt") or "")
+        label  = task_label(task.get("prompt") or "")
         labels.append(label or tid[:8])
 
         if status != "done":

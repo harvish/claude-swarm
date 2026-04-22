@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Single dispatcher for all swarm-* commands.
+# Symlink swarm-<cmd> -> swarm and this script routes by argv[0] basename.
+REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+SKILL_DIR="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
+CMD="$(basename "$0")"       # e.g. "swarm-spawn"
+MODULE="${CMD#swarm-}"       # e.g. "spawn"
+
+if [[ -z "$MODULE" || "$MODULE" == "swarm" ]]; then
+    echo "usage: swarm-<command> [args]" >&2
+    echo "commands: spawn wait expert logs cancel clean status doctor retry synthesize" >&2
+    exit 1
+fi
+
+exec python3 -c "
+import sys
+sys.path.insert(0, '$SKILL_DIR')
+from scripts.$MODULE import main
+main()
+" "$@"
