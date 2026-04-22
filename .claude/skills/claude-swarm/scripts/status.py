@@ -19,6 +19,18 @@ _STATUS_STYLE = {
 
 _ZOMBIE_THRESHOLD_S = 600  # 10 min with no completion = likely hung
 
+
+def _task_label(prompt: str, max_len: int = 65) -> str:
+    """Short display label. Expert prompts end with 'Task: <topic>'; extract just the topic."""
+    lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
+    if not lines:
+        return ""
+    last = lines[-1]
+    if last.startswith("Task: "):
+        last = last[6:]
+    candidate = last if len(last) <= max_len else lines[0]
+    return candidate[:max_len]
+
 def _style(status):
     return _STATUS_STYLE.get(status, ("white", "? "))
 
@@ -79,7 +91,7 @@ def _make_table(tasks, title="Recent Tasks", live=False):
             spinner_frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
             icon = spinner_frames[int(time.time() * 8) % len(spinner_frames)]
         parent = str(t["parent_id"])[:8] if t.get("parent_id") else "-"
-        prompt = (t.get("prompt") or "")[:65].split("\n")[0]
+        prompt = _task_label(t.get("prompt") or "")
         table.add_row(
             Text(icon,              style=color),
             Text(str(t["id"])[:8],  style="dim"),

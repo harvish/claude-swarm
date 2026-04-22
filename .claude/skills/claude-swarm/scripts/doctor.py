@@ -73,14 +73,22 @@ def run():
     _check("claude CLI in PATH", ok, "" if ok else "install Claude Code: https://claude.ai/code")
     passed += ok; failed += not ok
 
-    # 7. ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / OPENROUTER_API_KEY
+    # 7. Auth credential — env var OR Claude Code local session (~/.claude/.credentials.json)
+    from pathlib import Path
+    _creds_file = Path.home() / ".claude" / ".credentials.json"
     has_key = bool(
         os.environ.get("ANTHROPIC_API_KEY") or
         os.environ.get("ANTHROPIC_AUTH_TOKEN") or
-        os.environ.get("OPENROUTER_API_KEY")
+        os.environ.get("OPENROUTER_API_KEY") or
+        _creds_file.exists()
     )
-    _check("API key set (ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / OPENROUTER_API_KEY)", has_key,
-           "" if has_key else "child agents won't authenticate")
+    if has_key and _creds_file.exists() and not any(os.environ.get(v) for v in
+            ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENROUTER_API_KEY")):
+        detail = f"via {_creds_file}"
+    else:
+        detail = ""
+    _check("Auth credential set", has_key,
+           detail if has_key else "set ANTHROPIC_API_KEY or log in with 'claude' CLI")
     passed += has_key; failed += not has_key
 
     # 8. rich installed

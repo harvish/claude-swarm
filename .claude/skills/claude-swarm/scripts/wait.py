@@ -23,6 +23,21 @@ def _style(status):
     return _STATUS_STYLE.get(status, ("white", "? "))
 
 
+def _task_label(prompt: str, max_len: int = 65) -> str:
+    """Short display label from a prompt. Expert prompts end with 'Task: <topic>';
+    extract just the topic. For plain prompts return the first line."""
+    lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
+    if not lines:
+        return ""
+    # prefer last line — expert templates always put "Task: <topic>" at end
+    last = lines[-1]
+    if last.startswith("Task: "):
+        last = last[6:]
+    # if last line is still very long (generic prompt), use first line instead
+    candidate = last if len(last) <= max_len else lines[0]
+    return candidate[:max_len]
+
+
 def _elapsed(task):
     if not task.get("started_at"):
         return ""
@@ -92,13 +107,12 @@ def _make_table(task_ids, task_cache, pending, start_mono, title="Tasks"):
             spinner_frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
             icon = spinner_frames[int(time.monotonic() * 8) % len(spinner_frames)]
 
-        # show live log preview while running, prompt otherwise
+        # show live log preview while running, topic label otherwise
         if status == "running" and show_preview:
             preview = _last_log_line(tid)
             label   = Text(preview or "…", style="italic dim")
         else:
-            prompt  = (t.get("prompt") or "")[:65].split("\n")[0]
-            label   = Text(prompt, style="dim")
+            label   = Text(_task_label(t.get("prompt", "")), style="dim")
 
         table.add_row(
             Text(icon,              style=color),
@@ -201,7 +215,9 @@ def _print_results(task_ids, results):
                 continue
             status = task["status"]
             color, icon = _style(status)
-            title = Text(f"{icon} {tid[:8]}  [{status}]  {_elapsed(task)}", style=f"bold {color}")
+            topic = _task_label(task.get("prompt", ""), max_len=50)
+            label_part = f"  —  {topic}" if topic else ""
+            title = Text(f"{icon} {tid[:8]}  [{status}]  {_elapsed(task)}{label_part}", style=f"bold {color}")
             body  = task.get("output") or task.get("error") or ""
             console.print(Panel(
                 Markdown(body) if body else Text("(no output)", style="dim"),
