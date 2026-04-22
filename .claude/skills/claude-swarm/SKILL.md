@@ -91,6 +91,17 @@ swarm-doctor
 
 Checks: SWARM_PG_DSN set, postgres reachable, tasks table exists, tmux available, swarm session running, claude CLI in PATH, API key set, rich installed.
 
+## Retrying Failed Tasks
+
+Re-spawn a failed or timed-out task with the same prompt (no copy-paste needed):
+```bash
+swarm-retry <task_id>
+```
+
+Prints the new task ID. Detects the original expert type from the prompt so
+`swarm-retry` preserves researcher/analyst/coder/synthesizer semantics. Only
+works on tasks with status `failed` or `timeout`.
+
 ## Cancelling and Cleaning Up
 
 ```bash

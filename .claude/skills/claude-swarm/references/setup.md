@@ -41,7 +41,7 @@ SCRIPTS_PARENT="$SWARM_ROOT/.claude/skills/claude-swarm"
 
 mkdir -p ~/.local/bin
 
-for cmd in spawn wait expert logs cancel clean status doctor; do
+for cmd in spawn wait expert logs cancel clean status doctor retry; do
 cat > ~/.local/bin/swarm-$cmd << WRAPPER
 #!/usr/bin/env bash
 export SWARM_PG_DSN="\${SWARM_PG_DSN:-$DSN}"
@@ -142,6 +142,7 @@ All 8 checks should pass. Common fixes:
 | `swarm-status --live` | Auto-refreshing live dashboard |
 | `swarm-logs <id>` | Stream live output from a running task |
 | `swarm-cancel <id>` | Cancel a running task |
+| `swarm-retry <id>` | Re-spawn a failed/timed-out task with the same prompt |
 | `swarm-clean` | Close tmux windows for finished tasks |
 | `swarm-clean --logs` | Also purge preserved log files |
 | `swarm-doctor` | Pre-flight check for all dependencies |
