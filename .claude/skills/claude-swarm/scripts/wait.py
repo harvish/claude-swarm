@@ -239,6 +239,22 @@ def _print_results(task_ids, results):
             print()
 
 
+def _print_results_json(task_ids, results):
+    import json
+    out = []
+    for tid in task_ids:
+        task = results.get(tid) or {}
+        out.append({
+            "id":      tid,
+            "label":   _task_label(task.get("prompt", "")),
+            "status":  task.get("status", "unknown"),
+            "elapsed": _elapsed(task),
+            "output":  task.get("output") or "",
+            "error":   task.get("error") or "",
+        })
+    print(json.dumps(out, indent=2))
+
+
 @handle_connection_error
 def main():
     import argparse
@@ -246,9 +262,14 @@ def main():
     parser.add_argument("task_ids", nargs="+", metavar="task_id")
     parser.add_argument("--timeout", "-t", type=int, default=600,
                         help="Seconds to wait before marking tasks as timed out (default: 600)")
+    parser.add_argument("--json", action="store_true",
+                        help="Output results as JSON (useful for scripting / orchestrator)")
     args = parser.parse_args()
     results = wait_for(args.task_ids, timeout=args.timeout)
-    _print_results(args.task_ids, results)
+    if args.json:
+        _print_results_json(args.task_ids, results)
+    else:
+        _print_results(args.task_ids, results)
 
 
 if __name__ == "__main__":

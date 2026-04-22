@@ -34,9 +34,11 @@ swarm-expert coder     "<task>"      # WebFetch + Read + Write + Bash
 Each spawn prints a UUID. Pass one or more to `swarm-wait`:
 ```bash
 swarm-wait <id1> [<id2> <id3> ...]
+swarm-wait <id1> <id2> --timeout 900   # override timeout (default: 600s)
+swarm-wait <id1> <id2> --json          # structured JSON output for scripting
 ```
 
-`swarm-wait` shows a **live Rich table** — per-task rows with spinner, status, elapsed time, and last log line — then prints color-coded result panels (green=done, red=failed).
+`swarm-wait` shows a **live Rich table** — per-task rows with spinner, status, elapsed time, and last log line — then prints color-coded result panels (green=done, red=failed). For expert tasks the table and panels show the **task topic** (e.g. "AAPL 2025 analyst outlook") rather than the system prompt.
 
 ### Passing context
 - `swarm-spawn "<prompt>" --workdir <path>` — child works in that directory
