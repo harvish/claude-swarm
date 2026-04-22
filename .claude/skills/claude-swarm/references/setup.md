@@ -30,32 +30,25 @@ No package install needed — swarm commands run directly from the skill scripts
 
 ---
 
-## Step 3 — Create bash wrappers
+## Step 3 — Symlink bin/ wrappers into PATH
 
-Creates `swarm-*` commands in `~/.local/bin` so they work from any shell.
+The `bin/` directory in the skill is version-controlled and contains
+self-locating wrappers (they resolve their own path via `readlink -f`,
+so symlinks work correctly from any location).
+
 Run from the project root (where `.agents/` lives):
 
 ```bash
 SWARM_ROOT="$(pwd)"
-SCRIPTS_PARENT="$SWARM_ROOT/.claude/skills/claude-swarm"
+BIN_DIR="$SWARM_ROOT/.claude/skills/claude-swarm/bin"
 
 mkdir -p ~/.local/bin
 
-for cmd in spawn wait expert logs cancel clean status doctor retry synthesize; do
-cat > ~/.local/bin/swarm-$cmd << WRAPPER
-#!/usr/bin/env bash
-export SWARM_PG_DSN="\${SWARM_PG_DSN:-$DSN}"
-exec python3 -c "
-import sys
-sys.path.insert(0, '$SCRIPTS_PARENT')
-from scripts.${cmd} import main
-main()
-" "\$@"
-WRAPPER
-chmod +x ~/.local/bin/swarm-$cmd
+for f in "$BIN_DIR"/swarm-*; do
+  ln -sf "$f" ~/.local/bin/"$(basename "$f")"
 done
 
-echo "Created: $(ls ~/.local/bin/swarm-* | xargs -n1 basename | tr '\n' ' ')"
+echo "Linked: $(ls ~/.local/bin/swarm-* | xargs -n1 basename | tr '\n' ' ')"
 ```
 
 ---
