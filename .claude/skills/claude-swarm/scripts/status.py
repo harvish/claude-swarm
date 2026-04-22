@@ -119,7 +119,7 @@ def _plain_snapshot(tasks):
             end = t.get("completed_at") or datetime.datetime.now(datetime.timezone.utc)
             secs = int((end - t["started_at"]).total_seconds())
             elapsed = f"{secs}s"
-        prompt = (t.get("prompt") or "")[:55].split("\n")[0]
+        prompt = _task_label(t.get("prompt") or "", max_len=55)
         print(f"{icon} {str(t['id'])[:8]}  {status:<9}  {elapsed:>7}  {prompt}")
 
 
