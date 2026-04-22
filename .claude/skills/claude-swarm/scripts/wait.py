@@ -200,6 +200,34 @@ def wait_for(task_ids: list[str], timeout: int = 300) -> dict:
     return task_cache
 
 
+def _wall_time(results) -> str:
+    """Total wall time from earliest start to latest completion across all tasks."""
+    import datetime
+    started    = [t["started_at"]    for t in results.values() if t.get("started_at")]
+    completed  = [t["completed_at"]  for t in results.values() if t.get("completed_at")]
+    if not started or not completed:
+        return ""
+    secs = int((max(completed) - min(started)).total_seconds())
+    return f"{secs}s"
+
+
+def _synthesis_hint(task_ids, results) -> str:
+    """Return a synthesizer hint if multiple done research/analysis tasks exist."""
+    done_tasks = [results[tid] for tid in task_ids
+                  if results.get(tid, {}).get("status") == "done"]
+    if len(done_tasks) < 2:
+        return ""
+    # Only hint for expert tasks (prompts that contain 'Task: ')
+    research_done = [t for t in done_tasks if "Task: " in (t.get("prompt") or "")]
+    if len(research_done) < 2:
+        return ""
+    topics = [_task_label(t.get("prompt", "")) for t in research_done]
+    combined = " + ".join(topics[:2])
+    if len(research_done) > 2:
+        combined += f" + {len(research_done)-2} more"
+    return f'swarm-expert synthesizer "{combined}"'
+
+
 def _print_results(task_ids, results):
     try:
         from rich.console  import Console
@@ -215,10 +243,12 @@ def _print_results(task_ids, results):
         timeout = sum(1 for t in results.values() if t.get("status") == "timeout")
         total   = len(task_ids)
         words   = sum(len((t.get("output") or "").split()) for t in results.values())
+        wall    = _wall_time(results)
         parts = [f"[green]{done}/{total} done[/green]"]
         if failed:  parts.append(f"[red]{failed} failed[/red]")
         if timeout: parts.append(f"[red]{timeout} timed out[/red]")
         parts.append(f"~{words:,} words")
+        if wall:    parts.append(f"{wall} total")
         console.print("  " + "  ·  ".join(parts))
         console.print()
 
@@ -232,11 +262,22 @@ def _print_results(task_ids, results):
             label_part = f"  —  {topic}" if topic else ""
             title = Text(f"{icon} {tid[:8]}  [{status}]  {_elapsed(task)}{label_part}", style=f"bold {color}")
             body  = task.get("output") or task.get("error") or ""
+            footer = None
+            if status in ("failed", "timeout"):
+                footer = f"[dim]Retry: swarm-retry {tid[:8]}[/dim]"
             console.print(Panel(
                 Markdown(body) if body else Text("(no output)", style="dim"),
                 title=title,
                 border_style=color,
+                subtitle=footer,
             ))
+
+        # synthesis hint
+        hint = _synthesis_hint(task_ids, results)
+        if hint:
+            console.print(f"  [dim]Synthesize:[/dim]  {hint}")
+            console.print()
+
     except ImportError:
         sep = "=" * 60
         for tid in task_ids:
@@ -249,23 +290,32 @@ def _print_results(task_ids, results):
             body = task.get("output") or task.get("error") or ""
             if body:
                 print(body)
+            if task.get("status") in ("failed", "timeout"):
+                print(f"  Retry: swarm-retry {tid[:8]}")
             print()
 
 
 def _print_results_json(task_ids, results):
     import json
+    import datetime
+    def _serial(o):
+        if isinstance(o, datetime.datetime):
+            return o.isoformat()
+        return str(o)
     out = []
     for tid in task_ids:
         task = results.get(tid) or {}
+        output = task.get("output") or ""
         out.append({
-            "id":      tid,
-            "label":   _task_label(task.get("prompt", "")),
-            "status":  task.get("status", "unknown"),
-            "elapsed": _elapsed(task),
-            "output":  task.get("output") or "",
-            "error":   task.get("error") or "",
+            "id":         tid,
+            "label":      _task_label(task.get("prompt", "")),
+            "status":     task.get("status", "unknown"),
+            "elapsed":    _elapsed(task),
+            "word_count": len(output.split()) if output else 0,
+            "output":     output,
+            "error":      task.get("error") or "",
         })
-    print(json.dumps(out, indent=2))
+    print(json.dumps(out, default=_serial, indent=2))
 
 
 @handle_connection_error

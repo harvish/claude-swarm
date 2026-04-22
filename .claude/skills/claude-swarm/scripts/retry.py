@@ -4,6 +4,7 @@ import sys
 
 from . import db
 from .spawn import spawn
+from .expert import EXPERT_TOOLS
 from .errors import handle_connection_error
 
 
@@ -33,8 +34,9 @@ def retry(task_id: str) -> str:
     else:
         task_type = "generic"
 
+    tools = EXPERT_TOOLS.get(task_type)  # None for generic, correct list for expert types
     print(f"[swarm] retrying {task_id[:8]} ({task_type}, was {status})", file=sys.stderr)
-    return spawn(prompt, parent_id=parent_id, tools=None, task_type=task_type)
+    return spawn(prompt, parent_id=parent_id, tools=tools, task_type=task_type)
 
 
 @handle_connection_error
