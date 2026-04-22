@@ -209,6 +209,20 @@ def _print_results(task_ids, results):
         from rich.text     import Text
         console = Console()
         console.print()  # blank line after the table
+
+        # summary line
+        done    = sum(1 for t in results.values() if t.get("status") == "done")
+        failed  = sum(1 for t in results.values() if t.get("status") == "failed")
+        timeout = sum(1 for t in results.values() if t.get("status") == "timeout")
+        total   = len(task_ids)
+        words   = sum(len((t.get("output") or "").split()) for t in results.values())
+        parts = [f"[green]{done}/{total} done[/green]"]
+        if failed:  parts.append(f"[red]{failed} failed[/red]")
+        if timeout: parts.append(f"[red]{timeout} timed out[/red]")
+        parts.append(f"~{words:,} words")
+        console.print("  " + "  ·  ".join(parts))
+        console.print()
+
         for tid in task_ids:
             task = results.get(tid)
             if not task:

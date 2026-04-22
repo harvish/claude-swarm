@@ -3,9 +3,10 @@
 from .spawn import spawn
 
 EXPERT_TOOLS = {
-    "researcher": ["WebSearch", "WebFetch"],
-    "analyst":    ["WebSearch", "WebFetch"],
-    "coder":      ["WebFetch", "Read", "Write", "Bash"],
+    "researcher":  ["WebSearch", "WebFetch"],
+    "analyst":     ["WebSearch", "WebFetch"],
+    "coder":       ["WebFetch", "Read", "Write", "Bash"],
+    "synthesizer": [],  # no tools needed — works from provided context only
 }
 
 EXPERT_PROMPTS = {
@@ -56,6 +57,29 @@ Instructions:
 - Use WebFetch to look up documentation if needed
 - Include brief explanation of your approach
 - Handle edge cases
+
+Task: {task}""",
+
+    "synthesizer": """You are a synthesis expert. Your job is to read the research and analysis provided below and produce a clear, actionable summary.
+
+Instructions:
+- Extract the most important facts, trends, and recommendations
+- Resolve conflicting viewpoints — explain the disagreement, then give your best assessment
+- Identify gaps: what's missing or uncertain?
+- Be direct. Write for a smart reader who is short on time.
+
+Output format:
+## Executive Summary
+(3-5 bullets — the things the reader must know)
+
+## Key Findings
+(one finding per bullet, with attribution if multiple sources provided)
+
+## Gaps & Caveats
+(what's missing, outdated, or uncertain)
+
+## Recommendation
+(one clear, opinionated answer to the original question)
 
 Task: {task}""",
 }
