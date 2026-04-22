@@ -29,11 +29,10 @@ def _task_label(prompt: str, max_len: int = 65) -> str:
     lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
     if not lines:
         return ""
-    # prefer last line — expert templates always put "Task: <topic>" at end
     last = lines[-1]
     if last.startswith("Task: "):
-        last = last[6:]
-    # if last line is still very long (generic prompt), use first line instead
+        return last[6:][:max_len]  # explicit task label — always use, just truncate
+    # generic prompt: last line may be unhelpful; prefer first line if last is too long
     candidate = last if len(last) <= max_len else lines[0]
     return candidate[:max_len]
 

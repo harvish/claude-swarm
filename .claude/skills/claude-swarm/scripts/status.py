@@ -27,7 +27,7 @@ def _task_label(prompt: str, max_len: int = 65) -> str:
         return ""
     last = lines[-1]
     if last.startswith("Task: "):
-        last = last[6:]
+        return last[6:][:max_len]  # explicit task label — always use, just truncate
     candidate = last if len(last) <= max_len else lines[0]
     return candidate[:max_len]
 

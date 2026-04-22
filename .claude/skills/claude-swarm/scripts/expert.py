@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Expert spawn wrappers with role-specific system prompts and tool restrictions."""
+import datetime
 from .spawn import spawn
+
+def _today() -> str:
+    return datetime.date.today().strftime("%B %d, %Y")
 
 EXPERT_TOOLS = {
     "researcher":  ["WebSearch", "WebFetch"],
@@ -10,7 +14,7 @@ EXPERT_TOOLS = {
 }
 
 EXPERT_PROMPTS = {
-    "researcher": """You are a research expert. Your job is to thoroughly research the given topic using WebFetch and WebSearch tools.
+    "researcher": """You are a research expert. Today's date is {today}. Your job is to thoroughly research the given topic using WebFetch and WebSearch tools.
 
 Instructions:
 - Use WebSearch to find relevant sources
@@ -35,7 +39,7 @@ Output format:
 
 Task: {task}""",
 
-    "analyst": """You are a data and code analyst. Your job is to analyze the given subject and produce clear insights.
+    "analyst": """You are a data and code analyst. Today's date is {today}. Your job is to analyze the given subject and produce clear insights.
 
 Instructions:
 - Break down the problem systematically
@@ -89,7 +93,7 @@ def spawn_expert(expert_type: str, task: str, parent_id: str = None, workdir: st
     template = EXPERT_PROMPTS.get(expert_type)
     if not template:
         raise ValueError(f"Unknown expert type '{expert_type}'. Available: {list(EXPERT_PROMPTS)}")
-    prompt = template.format(task=task)
+    prompt = template.format(task=task, today=_today())
     tools = EXPERT_TOOLS.get(expert_type)
     return spawn(prompt, parent_id=parent_id, workdir=workdir, tools=tools, task_type=expert_type)
 
