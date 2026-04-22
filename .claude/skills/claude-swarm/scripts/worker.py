@@ -31,7 +31,7 @@ def run(task_id: str, allowed_tools: list[str] = None):
             for line in proc.stdout:
                 lf.write(line)
                 lines.append(line)
-        proc.wait(timeout=300)
+        proc.wait(timeout=600)
 
         output = "".join(lines).strip()
         if proc.returncode != 0:
@@ -40,7 +40,7 @@ def run(task_id: str, allowed_tools: list[str] = None):
             db.set_done(task_id, output)
     except subprocess.TimeoutExpired:
         proc.kill()
-        db.set_failed(task_id, "timeout after 300s")
+        db.set_failed(task_id, "timeout after 600s")
     except Exception as e:
         db.set_failed(task_id, str(e))
     finally:

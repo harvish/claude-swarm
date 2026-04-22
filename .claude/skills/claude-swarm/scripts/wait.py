@@ -241,12 +241,14 @@ def _print_results(task_ids, results):
 
 @handle_connection_error
 def main():
-    task_ids = sys.argv[1:]
-    if not task_ids:
-        print("usage: swarm-wait <task_id> [...]", file=sys.stderr)
-        sys.exit(1)
-    results = wait_for(task_ids)
-    _print_results(task_ids, results)
+    import argparse
+    parser = argparse.ArgumentParser(description="Wait for swarm tasks to complete")
+    parser.add_argument("task_ids", nargs="+", metavar="task_id")
+    parser.add_argument("--timeout", "-t", type=int, default=600,
+                        help="Seconds to wait before marking tasks as timed out (default: 600)")
+    args = parser.parse_args()
+    results = wait_for(args.task_ids, timeout=args.timeout)
+    _print_results(args.task_ids, results)
 
 
 if __name__ == "__main__":
