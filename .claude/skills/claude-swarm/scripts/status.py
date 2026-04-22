@@ -21,14 +21,15 @@ _ZOMBIE_THRESHOLD_S = 600  # 10 min with no completion = likely hung
 
 
 def _task_label(prompt: str, max_len: int = 65) -> str:
-    """Short display label. Expert prompts end with 'Task: <topic>'; extract just the topic."""
+    """Short display label. Expert prompts contain 'Task: <topic>'; extract just the topic
+    (first occurrence — synthesizer puts it near the top, researcher at the end)."""
     lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
     if not lines:
         return ""
-    last = lines[-1]
-    if last.startswith("Task: "):
-        return last[6:][:max_len]  # explicit task label — always use, just truncate
-    candidate = last if len(last) <= max_len else lines[0]
+    for line in lines:
+        if line.startswith("Task: "):
+            return line[6:][:max_len]
+    candidate = lines[-1] if len(lines[-1]) <= max_len else lines[0]
     return candidate[:max_len]
 
 def _style(status):

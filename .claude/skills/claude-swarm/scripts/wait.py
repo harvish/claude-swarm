@@ -24,16 +24,16 @@ def _style(status):
 
 
 def _task_label(prompt: str, max_len: int = 65) -> str:
-    """Short display label from a prompt. Expert prompts end with 'Task: <topic>';
-    extract just the topic. For plain prompts return the first line."""
+    """Short display label from a prompt. Expert prompts contain 'Task: <topic>';
+    extract just the topic (first occurrence — synthesizer puts it near the top)."""
     lines = [l.strip() for l in (prompt or "").splitlines() if l.strip()]
     if not lines:
         return ""
-    last = lines[-1]
-    if last.startswith("Task: "):
-        return last[6:][:max_len]  # explicit task label — always use, just truncate
-    # generic prompt: last line may be unhelpful; prefer first line if last is too long
-    candidate = last if len(last) <= max_len else lines[0]
+    for line in lines:
+        if line.startswith("Task: "):
+            return line[6:][:max_len]
+    # generic prompt: prefer last line if short, else first
+    candidate = lines[-1] if len(lines[-1]) <= max_len else lines[0]
     return candidate[:max_len]
 
 
@@ -212,20 +212,14 @@ def _wall_time(results) -> str:
 
 
 def _synthesis_hint(task_ids, results) -> str:
-    """Return a synthesizer hint if multiple done research/analysis tasks exist."""
-    done_tasks = [results[tid] for tid in task_ids
-                  if results.get(tid, {}).get("status") == "done"]
-    if len(done_tasks) < 2:
+    """Return a swarm-synthesize command if multiple done research/analysis tasks exist."""
+    research_ids = [tid for tid in task_ids
+                    if results.get(tid, {}).get("status") == "done"
+                    and "Task: " in (results[tid].get("prompt") or "")]
+    if len(research_ids) < 2:
         return ""
-    # Only hint for expert tasks (prompts that contain 'Task: ')
-    research_done = [t for t in done_tasks if "Task: " in (t.get("prompt") or "")]
-    if len(research_done) < 2:
-        return ""
-    topics = [_task_label(t.get("prompt", "")) for t in research_done]
-    combined = " + ".join(topics[:2])
-    if len(research_done) > 2:
-        combined += f" + {len(research_done)-2} more"
-    return f'swarm-expert synthesizer "{combined}"'
+    id_args = " ".join(tid[:8] for tid in research_ids)
+    return f"swarm-synthesize {id_args}"
 
 
 def _print_results(task_ids, results):

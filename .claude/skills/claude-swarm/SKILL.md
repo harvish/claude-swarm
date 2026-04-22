@@ -91,6 +91,24 @@ swarm-doctor
 
 Checks: SWARM_PG_DSN set, postgres reachable, tasks table exists, tmux available, swarm session running, claude CLI in PATH, API key set, rich installed.
 
+## Synthesizing Results
+
+After parallel researchers complete, `swarm-wait` prints a ready-to-run hint:
+```
+Synthesize:  swarm-synthesize <id1> <id2> <id3>
+```
+
+Run it to auto-fetch all stored outputs and spawn a synthesizer:
+```bash
+swarm-synthesize <id1> <id2> <id3>                   # auto-topic from task labels
+swarm-synthesize <id1> <id2> -q "Which is riskier?"  # guiding question
+```
+
+Prints a new task ID; pipe to `swarm-wait` to see the result:
+```bash
+swarm-wait $(swarm-synthesize <id1> <id2> <id3>)
+```
+
 ## Retrying Failed Tasks
 
 Re-spawn a failed or timed-out task with the same prompt (no copy-paste needed):
